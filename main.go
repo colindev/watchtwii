@@ -150,9 +150,12 @@ func main() {
 			// 如果決定通知，則在 if shouldNotify 區塊內寫入新值
 		} else {
 			shouldNotify = false
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動不超過 %.2f%%，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff), thresholdChanged*100)
 		}
 
-	} // end if diffAbs > threshold
+	} else {
+		fmt.Printf("價差 %.2f 未超過閾值 %.2f，不發送通知。\n", diff, threshold)
+	}
 
 	// 判斷是否為關鍵時間
 	specificAlterMsg, isSpecificTime := CheckSpecificTimeAlert()
@@ -174,9 +177,5 @@ func main() {
 		} else {
 			fmt.Printf("✅ 已儲存當前價差 (%.2f) 作為下次比較的基準。\n", diff)
 		}
-	} else if isSignificantChange {
-		fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動不超過 %.2f%%，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff), thresholdChanged*100)
-	} else {
-		fmt.Printf("價差 %.2f 未超過閾值 %.2f，不發送通知。\n", diff, threshold)
 	}
 }
