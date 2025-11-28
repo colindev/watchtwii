@@ -63,7 +63,7 @@ deploy:
 	  --cpu 1 \
 	  --memory 512Mi \
 	  --max-retries 0 \
-	  --set-env-vars TELEGRAM_TOKEN="$(TELEGRAM_TOKEN)",TELEGRAM_CHAT_IDS="$(TELEGRAM_CHAT_IDS)",THRESHOLD="$(THRESHOLD)"
+	  --set-env-vars TELEGRAM_TOKEN="$(TELEGRAM_TOKEN)",TELEGRAM_CHAT_IDS="$(TELEGRAM_CHAT_IDS)",THRESHOLD="$(THRESHOLD),THRESHOLD_CHANGED=$(THRESHOLD_CHANGED)"
 	
 	@echo "✅ Cloud Run Job 部署成功或已更新至版本 $(VERSION)!"
 

@@ -5,12 +5,6 @@ import (
 	"log"
 	"math"
 	"os"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/antchfx/htmlquery"
-	tele "gopkg.in/telebot.v3"
 )
 
 // --- 設定區 (建議透過環境變數注入) ---
@@ -27,118 +21,11 @@ const (
 
 // 環境變數中的 Key
 var (
-	TelegramToken   = os.Getenv("TELEGRAM_TOKEN")
-	TelegramChatIDs = os.Getenv("TELEGRAM_CHAT_IDS") // 預期格式: "123456,789012"
-	ThresholdEnv    = os.Getenv("THRESHOLD")
+	TelegramToken       = os.Getenv("TELEGRAM_TOKEN")
+	TelegramChatIDs     = os.Getenv("TELEGRAM_CHAT_IDS") // 預期格式: "123456,789012"
+	ThresholdEnv        = os.Getenv("THRESHOLD")
+	ThresholdChangedEnv = os.Getenv("THRESHOLD_CHANGED")
 )
-
-// 定義盤別常數
-const (
-	SessionMorning = "Morning" // 早盤 (08:45 ~ 13:45)
-	SessionNight   = "Night"   // 夜盤 (15:00 ~ 05:00)
-	SessionClosed  = "Closed"  // 休市
-)
-
-// 1. 判斷台股早盤或夜盤
-// 回傳: sessionType (SessionMorning, SessionNight, SessionClosed), isTrading (bool)
-func GetSessionType() (string, bool) {
-	loc, err := time.LoadLocation("Asia/Taipei")
-	if err != nil {
-		log.Fatal("無法載入台北時區:", err)
-	}
-	now := time.Now().In(loc)
-
-	hour := now.Hour()
-	minute := now.Minute()
-	currentTime := hour*100 + minute
-
-	// 早盤判斷: 08:45 ~ 13:45
-	if currentTime >= 845 && currentTime <= 1345 {
-		return SessionMorning, true
-	}
-
-	// 夜盤判斷: 15:00 ~ 23:59 OR 00:00 ~ 05:00
-	if currentTime >= 1500 || currentTime <= 500 {
-		return SessionNight, true
-	}
-
-	return SessionClosed, false
-}
-
-// 2. 透過 URL 跟 XPath 取得原始字串
-func FetchValueString(urlLink string, xpathStr string) (string, error) {
-	doc, err := htmlquery.LoadURL(urlLink)
-	if err != nil {
-		return "", fmt.Errorf("載入 URL 失敗: %v", err)
-	}
-
-	node := htmlquery.FindOne(doc, xpathStr)
-	if node == nil {
-		return "", fmt.Errorf("找不到 XPath 節點: %s", xpathStr)
-	}
-
-	return htmlquery.InnerText(node), nil
-}
-
-// 3. 解析字串為 float64 (處理逗號與空白)
-func ParseToFloat(raw string) (float64, error) {
-	// 移除逗號 (例如: "23,000.50" -> "23000.50")
-	clean := strings.ReplaceAll(raw, ",", "")
-	clean = strings.TrimSpace(clean)
-
-	val, err := strconv.ParseFloat(clean, 64)
-	if err != nil {
-		return 0, fmt.Errorf("無法轉換為浮點數 '%s': %v", raw, err)
-	}
-	return val, nil
-}
-
-// 4. 發送 Telegram 通知
-func SendAlert(msg string) {
-	if TelegramToken == "" || TelegramChatIDs == "" {
-		log.Println("⚠️ 未設定 Telegram Token 或 Chat IDs，跳過通知")
-		log.Println("內容:", msg)
-		return
-	}
-
-	pref := tele.Settings{
-		Token:  TelegramToken,
-		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
-	}
-
-	b, err := tele.NewBot(pref)
-	if err != nil {
-		log.Println("Telegram Bot 初始化失敗:", err)
-		return
-	}
-
-	// 1. 使用逗號切割 ID 字串
-	ids := strings.Split(TelegramChatIDs, ",")
-
-	for _, idStr := range ids {
-		// 2. 去除前後空白 (避免設定變數時多打空白導致錯誤)
-		idStr = strings.TrimSpace(idStr)
-		if idStr == "" {
-			continue
-		}
-
-		// 3. 轉換 ID 為 int64
-		chatID, err := strconv.ParseInt(idStr, 10, 64)
-		if err != nil {
-			log.Printf("❌ 無法解析 Chat ID '%s': %v\n", idStr, err)
-			continue // 跳過這個錯誤的 ID，繼續發送給下一個
-		}
-
-		// 4. 發送訊息
-		user := &tele.User{ID: chatID}
-		_, err = b.Send(user, msg)
-		if err != nil {
-			log.Printf("❌ 發送給 ID [%d] 失敗: %v\n", chatID, err)
-		} else {
-			log.Printf("✅ 通知已發送給 ID [%d]\n", chatID)
-		}
-	}
-}
 
 func main() {
 	fmt.Println("啟動排程檢查...")
@@ -166,7 +53,7 @@ func main() {
 		return
 	}
 
-	// --- 步驟 B: 取得數值 ---
+	// --- 步驟 C: 取得數值 ---
 	// 1. 取得加權指數
 	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
 	if err != nil {
@@ -193,7 +80,7 @@ func main() {
 
 	fmt.Printf("📊 加權指數: %.2f | 台指期: %.2f\n", spotVal, futureVal)
 
-	// --- 步驟 C: 比較邏輯與通知 ---
+	// --- 步驟 D: 比較邏輯與通知 ---
 	// 計算價差 (加權 - 期貨)
 	// 正數 = 逆價差 (期貨 < 加權, 市場偏空)
 	// 負數 = 正價差 (期貨 > 加權, 市場偏多)
@@ -202,6 +89,12 @@ func main() {
 	// 通知訊息內容建構
 	var alertMsg string
 	shouldNotify := false
+
+	// 1. 從 Firestore 讀取上次被通知時的價差
+	lastDiff, err := GetLastNotifiedDiff()
+	if err != nil {
+		log.Printf("❌ 無法讀取上次價差，跳過抑制邏輯: %v", err)
+	}
 
 	if session == SessionMorning {
 		// --- 早盤邏輯 ---
@@ -226,10 +119,52 @@ func main() {
 		}
 	}
 
-	// --- 步驟 D: 發送 ---
+	thresholdChanged, err := ParseToFloat(ThresholdChangedEnv)
+	if err != nil {
+		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用 0.1 (10%)")
+		thresholdChanged = 0.1
+	}
+
+	// 判斷是否滿足主要警報條件 (|diff| > threshold)
+	if math.Abs(diff) > threshold {
+
+		// 檢查抑制條件：當前價差是否比上次通知的價差變動超過 10%
+		// 如果上次價差為 0 (首次運行)，或變動大於 10%，則繼續通知。
+		// 公式: |diffAbs - math.Abs(lastDiff)| / math.Abs(lastDiff) > 0.1
+
+		// 為了避免 lastDiff 為 0 導致除以 0 錯誤，我們使用一個閾值檢查：
+		isSignificantChange := false
+		if math.Abs(lastDiff) < 1.0 {
+			// 如果上次價差接近 0，則視為重大變動 (首次或趨勢剛形成)
+			isSignificantChange = true
+		} else {
+			// 變動百分比
+			changePct := math.Abs(math.Abs(diff)-math.Abs(lastDiff)) / math.Abs(lastDiff)
+			if changePct > thresholdChanged {
+				isSignificantChange = true
+			}
+		}
+
+		// 只有在超過閾值 AND 變動顯著時才設置 shouldNotify = true
+		if isSignificantChange {
+			shouldNotify = true
+			// 如果決定通知，則在 if shouldNotify 區塊內寫入新值
+		} else {
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動不超過 10%%，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff))
+		}
+
+	} // end if diffAbs > threshold
+
+	// --- 發送 ---
 	if shouldNotify {
 		fmt.Println("觸發條件，發送 Telegram 通知...")
 		SendAlert(alertMsg)
+		// 🎯 儲存當前價差，用於下次比較
+		if err := SaveCurrentDiff(diff); err != nil {
+			log.Printf("❌ 儲存當前價差失敗: %v", err)
+		} else {
+			fmt.Printf("✅ 已儲存當前價差 (%.2f) 作為下次比較的基準。\n", diff)
+		}
 	} else {
 		fmt.Printf("價差 %.2f 未超過閾值 %.2f，不發送通知。\n", diff, threshold)
 	}
