@@ -136,20 +136,10 @@ func main() {
 	// 判斷是否滿足主要警報條件 (|diff| > threshold)
 	isSignificantChange := false
 	if math.Abs(diff) > threshold {
-		// 檢查抑制條件：當前價差是否比上次通知的價差變動超過 10%
-		// 如果上次價差為 0 (首次運行)，或變動大於 10%，則繼續通知。
-		// 公式: |diffAbs - math.Abs(lastDiff)| / math.Abs(lastDiff) > 0.1
 
-		// 為了避免 lastDiff 為 0 導致除以 0 錯誤，我們使用一個閾值檢查：
-		if math.Abs(lastDiff) < 1.0 {
-			// 如果上次價差接近 0，則視為重大變動 (首次或趨勢剛形成)
+		changed := math.Abs(math.Abs(diff) - math.Abs(lastDiff))
+		if changed > thresholdChanged {
 			isSignificantChange = true
-		} else {
-			// 變動百分比
-			changePct := math.Abs(math.Abs(diff)-math.Abs(lastDiff)) / math.Abs(lastDiff)
-			if changePct > thresholdChanged {
-				isSignificantChange = true
-			}
 		}
 
 		// 只有在超過閾值 AND 變動顯著時才設置 shouldNotify = true
@@ -158,7 +148,7 @@ func main() {
 			// 如果決定通知，則在 if shouldNotify 區塊內寫入新值
 		} else {
 			shouldNotify = false
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動不超過 %.2f%%，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff), thresholdChanged*100)
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff), thresholdChanged)
 		}
 
 	} else {

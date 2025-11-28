@@ -18,13 +18,19 @@ TAG := $(REPO_HOST)/$(PROJECT_ID)/$(IMAGE_NAME):$(VERSION)
 # --- Cloud Scheduler 相關變數 ---
 # 透過 Shell 指令取得 RUN_PROJECT 的計算服務帳號 (Compute SA)
 SERVICE_ACCOUNT_EMAIL := $(shell gcloud projects describe $(RUN_PROJECT) --format='value(projectNumber)')-compute@developer.gserviceaccount.com
-# 排程器 Job 名稱
-SCHEDULER_JOB_NAME := cron-$(JOB_NAME)
-# 排程頻率：每 15 分鐘一次
-SCHEDULER_SCHEDULE := "*/5 * * * *"
-SCHEDULER_DESCRIPTION := "每5分鐘"
 # 目標 Cloud Run Job 的 URI (使用 RUN_PROJECT 才是正確的目標專案)
 SCHEDULER_URI := "https://$(REGION)-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(RUN_PROJECT)/jobs/$(JOB_NAME):run"
+SCHEDULER_TIMEZONE := Asia/Taipei
+# 1. 主交易日 Job: 週一到週五，每 5 分鐘
+SCHEDULER_JOB_NAME_WEEKDAY := cron-$(JOB_NAME)-M-F
+SCHEDULER_SCHEDULE_WEEKDAY := '*/5 * * * 1-5'
+
+# 2. 週六凌晨 Job: 週六 0:00 到 5:00，每 5 分鐘
+SCHEDULER_JOB_NAME_SATURDAY := cron-$(JOB_NAME)-SAT
+SCHEDULER_SCHEDULE_SATURDAY := '*/5 0-5 * * 6'
+# 說明: */5分鐘 0到5小時 *日期 *月份 6=週六
+
+SCHEDULER_DESCRIPTION := "每5分鐘"
 
 
 .PHONY: all build deploy scheduler clean help
@@ -68,36 +74,51 @@ deploy:
 	
 	@echo "✅ Cloud Run Job 部署成功或已更新至版本 $(VERSION)!"
 
-## scheduler: 創建或更新 Cloud Scheduler Job，每15分鐘觸發一次 Cloud Run Job。
-scheduler:
-	@echo "--- 創建/更新 Cloud Scheduler Job ---"
-	@echo "排程名稱: $(SCHEDULER_JOB_NAME)"
-	@echo "頻率: $(SCHEDULER_SCHEDULE)"
-	@echo "目標 URI: $(SCHEDULER_URI)"
-	@echo "服務帳號: $(SERVICE_ACCOUNT_EMAIL)"
-	
-	# 嘗試更新現有的 Job，如果失敗 (Job不存在)，則創建新的 Job
-	gcloud scheduler jobs update http $(SCHEDULER_JOB_NAME) \
+# 輔助指令：創建或更新單個排程器 Job
+define _CREATE_OR_UPDATE_SCHEDULER
+	@echo '--- 處理排程 Job: $(1) @ $(2) ---'
+	gcloud scheduler jobs update http $(1) \
 	  --project $(RUN_PROJECT) \
 	  --location $(REGION) \
-	  --schedule $(SCHEDULER_SCHEDULE) \
+	  --time-zone $(SCHEDULER_TIMEZONE) \
+	  --schedule $(2) \
 	  --uri $(SCHEDULER_URI) \
-	  --description "$(SCHEDULER_DESCRIPTION) 觸發 $(JOB_NAME) Job" \
-	  --oauth-service-account-email "$(SERVICE_ACCOUNT_EMAIL)" \
+	  --description $(3) \
+	  --oauth-service-account-email $(SERVICE_ACCOUNT_EMAIL) \
 	  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
 	  --http-method POST \
 	|| \
-	gcloud scheduler jobs create http $(SCHEDULER_JOB_NAME) \
+	gcloud scheduler jobs create http $(1) \
 	  --project $(RUN_PROJECT) \
 	  --location $(REGION) \
-	  --schedule $(SCHEDULER_SCHEDULE) \
+	  --time-zone $(SCHEDULER_TIMEZONE) \
+	  --schedule $(2) \
 	  --uri $(SCHEDULER_URI) \
-	  --description "$(SCHEDULER_DESCRIPTION) 觸發 $(JOB_NAME) Job" \
+	  --description $(3) \
 	  --oauth-service-account-email "$(SERVICE_ACCOUNT_EMAIL)" \
 	  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
 	  --http-method POST
+endef
 
-	@echo "✅ Cloud Scheduler Job 已設定為每 15 分鐘運行一次。"
+## scheduler: 創建或更新 Cloud Scheduler Job
+scheduler:
+	@echo "--- 創建/更新 Cloud Scheduler Jobs ---"
+	@echo "目標 URI: $(SCHEDULER_URI)"
+	@echo "服務帳號: $(SERVICE_ACCOUNT_EMAIL)"
+	
+	# 處理 Job 1: 週一到週五
+	$(call _CREATE_OR_UPDATE_SCHEDULER, \
+		$(SCHEDULER_JOB_NAME_WEEKDAY), \
+		$(SCHEDULER_SCHEDULE_WEEKDAY), \
+		"週一至週五，$(SCHEDULER_DESCRIPTION)觸發 $(JOB_NAME) Job")
+
+	# 處理 Job 2: 週六凌晨
+	$(call _CREATE_OR_UPDATE_SCHEDULER, \
+		$(SCHEDULER_JOB_NAME_SATURDAY), \
+		$(SCHEDULER_SCHEDULE_SATURDAY), \
+		"週六凌晨，$(SCHEDULER_DESCRIPTION)觸發 $(JOB_NAME) Job (夜盤收尾)")
+
+	@echo "✅ 所有 Cloud Scheduler Jobs 已設定完成。"
 
 ## help: 顯示所有可用目標 (Show available targets)
 help:
