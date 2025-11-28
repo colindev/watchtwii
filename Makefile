@@ -21,7 +21,8 @@ SERVICE_ACCOUNT_EMAIL := $(shell gcloud projects describe $(RUN_PROJECT) --forma
 # 排程器 Job 名稱
 SCHEDULER_JOB_NAME := cron-$(JOB_NAME)
 # 排程頻率：每 15 分鐘一次
-SCHEDULER_SCHEDULE := "*/15 * * * *"
+SCHEDULER_SCHEDULE := "*/5 * * * *"
+SCHEDULER_DESCRIPTION := "每5分鐘"
 # 目標 Cloud Run Job 的 URI (使用 RUN_PROJECT 才是正確的目標專案)
 SCHEDULER_URI := "https://$(REGION)-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/$(RUN_PROJECT)/jobs/$(JOB_NAME):run"
 
@@ -81,7 +82,7 @@ scheduler:
 	  --location $(REGION) \
 	  --schedule $(SCHEDULER_SCHEDULE) \
 	  --uri $(SCHEDULER_URI) \
-	  --description "每十五分鐘觸發 $(JOB_NAME) Job" \
+	  --description "$(SCHEDULER_DESCRIPTION) 觸發 $(JOB_NAME) Job" \
 	  --oauth-service-account-email "$(SERVICE_ACCOUNT_EMAIL)" \
 	  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
 	  --http-method POST \
@@ -91,7 +92,7 @@ scheduler:
 	  --location $(REGION) \
 	  --schedule $(SCHEDULER_SCHEDULE) \
 	  --uri $(SCHEDULER_URI) \
-	  --description "每十五分鐘觸發 $(JOB_NAME) Job" \
+	  --description "$(SCHEDULER_DESCRIPTION) 觸發 $(JOB_NAME) Job" \
 	  --oauth-service-account-email "$(SERVICE_ACCOUNT_EMAIL)" \
 	  --oauth-token-scope "https://www.googleapis.com/auth/cloud-platform" \
 	  --http-method POST
