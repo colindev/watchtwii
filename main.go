@@ -14,8 +14,6 @@ import (
 
 // --- 設定區 (建議透過環境變數注入) ---
 const (
-	// 價差閾值 (Points)
-	Threshold = 30.0
 
 	// 這裡填入您實際要抓取的網站與 XPath
 	// 範例：Yahoo 股市 (僅供參考，XPath 需隨網頁結構更新)
@@ -30,6 +28,7 @@ const (
 var (
 	TelegramToken   = os.Getenv("TELEGRAM_TOKEN")
 	TelegramChatIDs = os.Getenv("TELEGRAM_CHAT_IDS") // 預期格式: "123456,789012"
+	ThresholdEnv    = os.Getenv("THRESHOLD")
 )
 
 // 定義盤別常數
@@ -143,7 +142,21 @@ func SendAlert(msg string) {
 func main() {
 	fmt.Println("啟動排程檢查...")
 
-	// --- 步驟 A: 判斷盤別 ---
+	var threshold float64 = 100 // 預設值
+	var err error
+	// --- 步驟 A: 讀取並驗證閾值 ---
+	if ThresholdEnv == "" {
+		fmt.Printf("❌ 錯誤: THRESHOLD 環境變數未設定。使用預設監控閾值: %.2f 點\n", threshold)
+	} else {
+		threshold, err = ParseToFloat(ThresholdEnv)
+		if err != nil {
+			fmt.Printf("❌ 錯誤: 無法解析 THRESHOLD 環境變數 '%s' 為浮點數: %v。使用預設監控閾值: %.2f 點\n", ThresholdEnv, err, threshold)
+		} else {
+			fmt.Printf("✅ 使用監控閾值: %.2f 點\n", threshold)
+		}
+	}
+
+	// --- 步驟 B: 判斷盤別 ---
 	session, isTrading := GetSessionType()
 	fmt.Printf("目前時段: %s, 是否交易中: %v\n", session, isTrading)
 
@@ -195,11 +208,11 @@ func main() {
 
 	if session == SessionMorning {
 		// --- 早盤邏輯 ---
-		if diff > Threshold {
+		if diff > threshold {
 			// 加權 > 台指 (逆價差過大)
 			alertMsg = fmt.Sprintf("☀️ [早盤警示]\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", diff, spotVal, futureVal)
 			shouldNotify = true
-		} else if diff < -Threshold {
+		} else if diff < -threshold {
 			// 加權 < 台指 (正價差過大)
 			alertMsg = fmt.Sprintf("☀️ [早盤警示]\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", -diff, spotVal, futureVal)
 			shouldNotify = true
@@ -207,10 +220,10 @@ func main() {
 	} else if session == SessionNight {
 		// --- 夜盤邏輯 ---
 		// 注意：夜盤的加權是指數收盤價，通常用來參考國際盤對台指的拉動
-		if diff > Threshold {
+		if diff > threshold {
 			alertMsg = fmt.Sprintf("🌙 [夜盤警示]\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", diff, spotVal, futureVal)
 			shouldNotify = true
-		} else if diff < -Threshold {
+		} else if diff < -threshold {
 			alertMsg = fmt.Sprintf("🌙 [夜盤警示]\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", -diff, spotVal, futureVal)
 			shouldNotify = true
 		}
@@ -221,6 +234,6 @@ func main() {
 		fmt.Println("觸發條件，發送 Telegram 通知...")
 		SendAlert(alertMsg)
 	} else {
-		fmt.Printf("價差 %.2f 未超過閾值 %.2f，不發送通知。\n", diff, Threshold)
+		fmt.Printf("價差 %.2f 未超過閾值 %.2f，不發送通知。\n", diff, threshold)
 	}
 }

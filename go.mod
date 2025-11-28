@@ -1,6 +1,6 @@
 module watchtwii
 
-go 1.24.3
+go 1.21
 
 require (
 	github.com/antchfx/htmlquery v1.3.5 // indirect

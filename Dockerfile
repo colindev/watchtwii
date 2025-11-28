@@ -13,7 +13,7 @@ COPY . .
 
 # 建置靜態連結的二進位執行檔
 # CGO_ENABLED=0 確保沒有 C 語言依賴，使得執行檔更輕量且可移植
-RUN CGO_ENABLED=0 go build -o /main main.go scraper.go
+RUN CGO_ENABLED=0 go build -o /main .
 
 
 # 階段 2: 最終輕量級執行環境 (Final Stage)
