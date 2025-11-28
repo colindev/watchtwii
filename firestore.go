@@ -20,7 +20,7 @@ const (
 
 // 輔助函式：取得 Firestore 客戶端
 func getFirestoreClient() (*firestore.Client, error) {
-	// 由於 Cloud Run Jobs 運行在 GCP 專案內，環境會自動提供驗證
+	// 由於 Cloud Run Jobs 無法讀取GCP_PROJECT, 所以部署時餵入
 	ctx := context.Background()
 	client, err := firestore.NewClient(ctx, os.Getenv("GCP_PROJECT")) // 必須從 ENV 讀取 GCP_PROJECT ID
 	if err != nil {
