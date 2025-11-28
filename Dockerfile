@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 go build -o /main .
 FROM alpine:latest
 
 # 安裝 ca-certificates 是為了讓 HTTPS 請求可以運作
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates tzdata
 
 # 設定時區 (非必須，但有利於日誌記錄)
 ENV TZ Asia/Taipei
