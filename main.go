@@ -57,24 +57,32 @@ func main() {
 	// 1. 取得加權指數
 	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
 	if err != nil {
-		log.Printf("❌ 抓取加權指數失敗: %v", err)
+		msg := fmt.Sprintf("❌ 抓取加權指數失敗: %v", err)
+		log.Println(msg)
+		SendAlert(msg)
 		return
 	}
 	spotVal, err := ParseToFloat(rawSpot)
 	if err != nil {
-		log.Printf("❌ 解析加權指數失敗: %v", err)
+		msg := fmt.Sprintf("❌ 解析加權指數失敗: %v", err)
+		log.Println(msg)
+		SendAlert(msg)
 		return
 	}
 
 	// 2. 取得台指期
 	rawFuture, err := FetchValueString(FutureURL, FutureXPath)
 	if err != nil {
-		log.Printf("❌ 抓取台指期失敗: %v", err)
+		msg := fmt.Sprintf("❌ 抓取台指期失敗: %v", err)
+		log.Println(msg)
+		SendAlert(msg)
 		return
 	}
 	futureVal, err := ParseToFloat(rawFuture)
 	if err != nil {
-		log.Printf("❌ 解析台指期失敗: %v", err)
+		msg := fmt.Sprintf("❌ 解析台指期失敗: %v", err)
+		log.Println(msg)
+		SendAlert(msg)
 		return
 	}
 
