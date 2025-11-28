@@ -98,48 +98,62 @@ func main() {
 	var alertMsg string
 	shouldNotify := false
 
-	// 1. 從 Firestore 讀取上次被通知時的價差
-	lastDiff, err := GetLastNotifiedDiff()
+	thresholdChanged, err := ParseToFloat(ThresholdChangedEnv)
+	if err != nil {
+		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用10點")
+		thresholdChanged = 10
+	}
+
+	// 從 Firestore 讀取上次被通知時的價差
+	d, err := GetLastNotifiedData()
 	if err != nil {
 		log.Printf("❌ 無法讀取上次價差，跳過抑制邏輯: %v", err)
 	}
+
+	var lastDiff = d.LastDiffValue
+	var changed = diff - lastDiff
+	var needCheckChanged bool
 
 	if session == SessionMorning {
 		// --- 早盤邏輯 ---
 		if diff > threshold {
 			// 加權 > 台指 (逆價差過大)
-			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "UP", math.Abs(diff), spotVal, futureVal)
+			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📈", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
+			needCheckChanged = true
 		} else if diff < -threshold {
 			// 加權 < 台指 (正價差過大)
-			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "DOWN", math.Abs(diff), spotVal, futureVal)
+			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
+			shouldNotify = true
+			needCheckChanged = true
+		} else if (spotVal - d.LastTWIIValue) > thresholdChanged {
+			// 指數上漲 - 早盤關注加權變動
+			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數上漲(%.2f)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📈", (spotVal - d.LastTWIIValue), math.Abs(diff), spotVal, futureVal)
+			shouldNotify = true
+		} else if (spotVal - d.LastTWIIValue) < -thresholdChanged {
+			// 指數下跌 - 早盤關注加權變動
+			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數下跌(%.2f)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📉", (spotVal - d.LastTWIIValue), math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
 		}
+
 	} else if session == SessionNight {
 		// --- 夜盤邏輯 ---
 		// 注意：夜盤的加權是指數收盤價，通常用來參考國際盤對台指的拉動
 		if diff > threshold {
-			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "DOWN", math.Abs(diff), spotVal, futureVal)
+			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
+			needCheckChanged = true
 		} else if diff < -threshold {
-			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "UP", math.Abs(diff), spotVal, futureVal)
+			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "📈", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
+			needCheckChanged = true
 		}
 	}
 
-	thresholdChanged, err := ParseToFloat(ThresholdChangedEnv)
-	if err != nil {
-		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用 0.1 (10%)")
-		thresholdChanged = 0.1
-	}
+	// 只有特定前置條件才需要進入異動幅度判斷
+	if needCheckChanged {
 
-	// 判斷是否滿足主要警報條件 (|diff| > threshold)
-	if math.Abs(diff) > threshold {
-
-		changed := math.Abs(diff) - math.Abs(lastDiff)
-		// 只有在超過閾值 AND 變動顯著時才設置 shouldNotify = true
 		if math.Abs(changed) >= thresholdChanged {
-			shouldNotify = true
 			if changed > 0 {
 				alertMsg = fmt.Sprintf("📈(幅度增加:%.2f)\n%s", changed, alertMsg)
 			} else if changed < 0 {
@@ -148,11 +162,9 @@ func main() {
 
 		} else {
 			shouldNotify = false
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff), thresholdChanged)
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, lastDiff, thresholdChanged)
 		}
 
-	} else {
-		fmt.Printf("價差 %.2f 未超過閾值 %.2f，不發送通知。\n", diff, threshold)
 	}
 
 	// 判斷是否為關鍵時間
@@ -170,10 +182,12 @@ func main() {
 		fmt.Println("觸發條件，發送 Telegram 通知...")
 		SendAlert(alertMsg)
 		// 🎯 儲存當前價差，用於下次比較
-		if err := SaveCurrentDiff(diff); err != nil {
+		d.LastTWIIValue = spotVal
+		d.LastDiffValue = diff
+		if err := SaveCurrentData(d); err != nil {
 			log.Printf("❌ 儲存當前價差失敗: %v", err)
 		} else {
-			fmt.Printf("✅ 已儲存當前價差 (%.2f) 作為下次比較的基準。\n", diff)
+			fmt.Printf("✅ 已儲存當前指數(%.2f)與價差 (%.2f) 作為下次比較的基準。\n", spotVal, diff)
 		}
 	}
 }
