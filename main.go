@@ -134,18 +134,18 @@ func main() {
 	}
 
 	// 判斷是否滿足主要警報條件 (|diff| > threshold)
-	isSignificantChange := false
 	if math.Abs(diff) > threshold {
 
-		changed := math.Abs(math.Abs(diff) - math.Abs(lastDiff))
-		if changed > thresholdChanged {
-			isSignificantChange = true
-		}
-
+		changed := math.Abs(diff) - math.Abs(lastDiff)
 		// 只有在超過閾值 AND 變動顯著時才設置 shouldNotify = true
-		if isSignificantChange {
+		if math.Abs(changed) >= thresholdChanged {
 			shouldNotify = true
-			// 如果決定通知，則在 if shouldNotify 區塊內寫入新值
+			if changed > 0 {
+				alertMsg = fmt.Sprintf("📈(幅度增加:%.2f)\n%s", changed, alertMsg)
+			} else if changed < 0 {
+				alertMsg = fmt.Sprintf("📉(幅度減少:%.2f)\n%s", changed, alertMsg)
+			}
+
 		} else {
 			shouldNotify = false
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", math.Abs(diff), math.Abs(lastDiff), thresholdChanged)
