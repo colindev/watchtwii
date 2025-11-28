@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -197,10 +198,6 @@ func main() {
 	// 正數 = 逆價差 (期貨 < 加權, 市場偏空)
 	// 負數 = 正價差 (期貨 > 加權, 市場偏多)
 	diff := spotVal - futureVal
-	absDiff := diff
-	if absDiff < 0 {
-		absDiff = -absDiff
-	}
 
 	// 通知訊息內容建構
 	var alertMsg string
@@ -210,21 +207,21 @@ func main() {
 		// --- 早盤邏輯 ---
 		if diff > threshold {
 			// 加權 > 台指 (逆價差過大)
-			alertMsg = fmt.Sprintf("☀️ [早盤警示]\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", diff, spotVal, futureVal)
+			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "UP", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
 		} else if diff < -threshold {
 			// 加權 < 台指 (正價差過大)
-			alertMsg = fmt.Sprintf("☀️ [早盤警示]\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", -diff, spotVal, futureVal)
+			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "DOWN", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
 		}
 	} else if session == SessionNight {
 		// --- 夜盤邏輯 ---
 		// 注意：夜盤的加權是指數收盤價，通常用來參考國際盤對台指的拉動
 		if diff > threshold {
-			alertMsg = fmt.Sprintf("🌙 [夜盤警示]\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", diff, spotVal, futureVal)
+			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "DOWN", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
 		} else if diff < -threshold {
-			alertMsg = fmt.Sprintf("🌙 [夜盤警示]\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", -diff, spotVal, futureVal)
+			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "UP", math.Abs(diff), spotVal, futureVal)
 			shouldNotify = true
 		}
 	}
