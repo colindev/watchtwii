@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
 	"os"
 )
 
@@ -88,16 +87,6 @@ func main() {
 
 	fmt.Printf("📊 加權指數: %.2f | 台指期: %.2f\n", spotVal, futureVal)
 
-	// --- 步驟 D: 比較邏輯與通知 ---
-	// 計算價差 (加權 - 期貨)
-	// 正數 = 逆價差 (期貨 < 加權, 市場偏空)
-	// 負數 = 正價差 (期貨 > 加權, 市場偏多)
-	diff := spotVal - futureVal
-
-	// 通知訊息內容建構
-	var alertMsg string
-	shouldNotify := false
-
 	thresholdChanged, err := ParseToFloat(ThresholdChangedEnv)
 	if err != nil {
 		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用10點")
@@ -110,62 +99,12 @@ func main() {
 		log.Printf("❌ 無法讀取上次價差，跳過抑制邏輯: %v", err)
 	}
 
-	var lastDiff = d.LastDiffValue
-	var changed = diff - lastDiff
-	var needCheckChanged bool
-
-	if session == SessionMorning {
-		// --- 早盤邏輯 ---
-		if diff > threshold {
-			// 加權 > 台指 (逆價差過大)
-			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📈", math.Abs(diff), spotVal, futureVal)
-			shouldNotify = true
-			needCheckChanged = true
-		} else if diff < -threshold {
-			// 加權 < 台指 (正價差過大)
-			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
-			shouldNotify = true
-			needCheckChanged = true
-		} else if (spotVal - d.LastTWIIValue) > thresholdChanged {
-			// 指數上漲 - 早盤關注加權變動
-			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數上漲(%.2f)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📈", (spotVal - d.LastTWIIValue), math.Abs(diff), spotVal, futureVal)
-			shouldNotify = true
-		} else if (spotVal - d.LastTWIIValue) < -thresholdChanged {
-			// 指數下跌 - 早盤關注加權變動
-			alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數下跌(%.2f)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📉", (spotVal - d.LastTWIIValue), math.Abs(diff), spotVal, futureVal)
-			shouldNotify = true
-		}
-
-	} else if session == SessionNight {
-		// --- 夜盤邏輯 ---
-		// 注意：夜盤的加權是指數收盤價，通常用來參考國際盤對台指的拉動
-		if diff > threshold {
-			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
-			shouldNotify = true
-			needCheckChanged = true
-		} else if diff < -threshold {
-			alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "📈", math.Abs(diff), spotVal, futureVal)
-			shouldNotify = true
-			needCheckChanged = true
-		}
+	msg, err := NewMessage(session)
+	if err != nil {
+		log.Fatalf("❌ 無法判斷開盤階段%s", session)
 	}
 
-	// 只有特定前置條件才需要進入異動幅度判斷
-	if needCheckChanged {
-
-		if math.Abs(changed) >= thresholdChanged {
-			if changed > 0 {
-				alertMsg = fmt.Sprintf("📈(幅度增加:%.2f)\n%s", changed, alertMsg)
-			} else if changed < 0 {
-				alertMsg = fmt.Sprintf("📉(幅度減少:%.2f)\n%s", changed, alertMsg)
-			}
-
-		} else {
-			shouldNotify = false
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, lastDiff, thresholdChanged)
-		}
-
-	}
+	alertMsg, shouldNotify := msg.Build(d, spotVal, futureVal, threshold, thresholdChanged)
 
 	// 判斷是否為關鍵時間
 	specificAlterMsg, isSpecificTime := CheckSpecificTimeAlert()
@@ -173,7 +112,7 @@ func main() {
 		shouldNotify = true
 		// 如果沒有符合觸發條件, 但是特定時間點依然發送, 要補上訊息
 		if alertMsg == "" {
-			alertMsg = fmt.Sprintf("[%s]\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", specificAlterMsg, math.Abs(diff), spotVal, futureVal)
+			alertMsg = msg.Info(specificAlterMsg, spotVal, futureVal)
 		}
 	}
 
@@ -183,11 +122,11 @@ func main() {
 		SendAlert(alertMsg)
 		// 🎯 儲存當前價差，用於下次比較
 		d.LastTWIIValue = spotVal
-		d.LastDiffValue = diff
+		d.LastDiffValue = spotVal - futureVal
 		if err := SaveCurrentData(d); err != nil {
 			log.Printf("❌ 儲存當前價差失敗: %v", err)
 		} else {
-			fmt.Printf("✅ 已儲存當前指數(%.2f)與價差 (%.2f) 作為下次比較的基準。\n", spotVal, diff)
+			fmt.Printf("✅ 已儲存當前指數(%.2f)與價差 (%.2f) 作為下次比較的基準。\n", spotVal, spotVal-futureVal)
 		}
 	}
 }
