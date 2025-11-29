@@ -20,6 +20,8 @@ type Data struct {
 	LastTWIIValue  float64
 	LastDiffValue  float64
 	LastUpdateTime time.Time
+	ErrorCount     int    // 連續失敗計數
+	LastError      string // 記錄最後一次錯誤訊息
 }
 
 func (d *Data) Map() map[string]interface{} {
@@ -27,6 +29,8 @@ func (d *Data) Map() map[string]interface{} {
 		"LastTWIIValue":  d.LastTWIIValue,
 		"LastDiffValue":  d.LastDiffValue,
 		"LastUpdateTime": time.Now(),
+		"ErrorCount":     d.ErrorCount,
+		"LastError":      d.LastError,
 	}
 }
 
@@ -47,8 +51,54 @@ func (d *Data) Clone(m map[string]interface{}) *Data {
 			d.LastUpdateTime = time.Unix(v, 0)
 		}
 	}
+	if val, ok := m["ErrorCount"]; ok {
+		// Firestore 數字有時會轉為 int64，需做類型斷言檢查
+		if v, isInt := val.(int64); isInt {
+			d.ErrorCount = int(v)
+		} else if v, isInt := val.(int); isInt {
+			d.ErrorCount = v
+		}
+	}
+	if val, ok := m["LastError"]; ok {
+		if v, isStr := val.(string); isStr {
+			d.LastError = v
+		}
+	}
 
 	return d
+}
+
+// CheckErrorState 檢查錯誤狀態變化
+// 回傳: (是否需要通知, 通知訊息)
+func (d *Data) CheckErrorState(currentErr error) (bool, string) {
+	if currentErr != nil {
+		// 情況 A: 發生錯誤
+		d.LastError = currentErr.Error()
+		d.ErrorCount++
+
+		if d.ErrorCount == 1 {
+			// 1. 正常 -> 失敗 (初次發生)
+			return true, fmt.Sprintf("❌ [系統異常] 資料抓取失敗\n錯誤: %v", currentErr)
+		} else {
+			// 3. 失敗 -> 失敗 (持續失敗中) -> 靜默 (Log only)
+			// 可選擇每累積 N 次 (例如 12 次 = 1小時) 才提醒一次
+			if d.ErrorCount%12 == 0 {
+				return true, fmt.Sprintf("⚠️ [系統持續異常] 已連續失敗 %d 次\n錯誤: %v", d.ErrorCount, currentErr)
+			}
+			return false, "" // 不發送通知
+		}
+	} else {
+		// 情況 B: 正常成功
+		if d.ErrorCount > 0 {
+			// 2. 失敗 -> 正常 (恢復)
+			failCount := d.ErrorCount
+			d.ErrorCount = 0
+			d.LastError = ""
+			return true, fmt.Sprintf("✅ [系統恢復] 服務已恢復正常\n(先前連續失敗 %d 次)", failCount)
+		}
+		// 4. 正常 -> 正常 -> 靜默
+		return false, ""
+	}
 }
 
 // 輔助函式：取得 Firestore 客戶端

@@ -18,6 +18,30 @@ const (
 	FutureXPath = "/html/body/div[1]/div/div/div/div/div[4]/div[1]/div/div/div[2]/div[3]/div[2]/div/div/ul/li[2]/div/div[4]/span"
 )
 
+func ScrapeData() (float64, float64, error) {
+	// 1. 取得加權指數
+	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
+	if err != nil {
+		return 0, 0, fmt.Errorf("抓取加權指數失敗: %w", err)
+	}
+	spotVal, err := ParseToFloat(rawSpot)
+	if err != nil {
+		return 0, 0, fmt.Errorf("解析加權指數失敗: %w", err)
+	}
+
+	// 2. 取得台指期
+	rawFuture, err := FetchValueString(FutureURL, FutureXPath)
+	if err != nil {
+		return 0, 0, fmt.Errorf("抓取台指期失敗: %w", err)
+	}
+	futureVal, err := ParseToFloat(rawFuture)
+	if err != nil {
+		return 0, 0, fmt.Errorf("解析台指期失敗: %w", err)
+	}
+
+	return spotVal, futureVal, nil
+}
+
 // 環境變數中的 Key
 var (
 	TelegramToken       = os.Getenv("TELEGRAM_TOKEN")
@@ -52,38 +76,36 @@ func main() {
 		return
 	}
 
-	// --- 步驟 C: 取得數值 ---
-	// 1. 取得加權指數
-	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
+	// 從 Firestore 讀取上次被通知時的價差
+	d, err := GetLastNotifiedData()
 	if err != nil {
-		msg := fmt.Sprintf("❌ 抓取加權指數失敗: %v", err)
-		log.Println(msg)
-		SendAlert(msg)
-		return
-	}
-	spotVal, err := ParseToFloat(rawSpot)
-	if err != nil {
-		msg := fmt.Sprintf("❌ 解析加權指數失敗: %v", err)
-		log.Println(msg)
-		SendAlert(msg)
-		return
+		log.Printf("⚠️ 無法讀取上次狀態 (視為初次運行): %v", err)
+		d = &Data{} // 初始化空物件
 	}
 
-	// 2. 取得台指期
-	rawFuture, err := FetchValueString(FutureURL, FutureXPath)
-	if err != nil {
-		msg := fmt.Sprintf("❌ 抓取台指期失敗: %v", err)
-		log.Println(msg)
-		SendAlert(msg)
-		return
+	// --- 執行爬蟲與錯誤狀態管理 ---
+	spotVal, futureVal, scrapeErr := ScrapeData()
+
+	// 🎯 核心：使用 CheckErrorState 處理狀態變化 (正常<->失敗)
+	shouldAlertError, errorMsg := d.CheckErrorState(scrapeErr)
+
+	if shouldAlertError {
+		fmt.Println("狀態改變，發送系統通知...")
+		SendAlert(errorMsg)
 	}
-	futureVal, err := ParseToFloat(rawFuture)
-	if err != nil {
-		msg := fmt.Sprintf("❌ 解析台指期失敗: %v", err)
-		log.Println(msg)
-		SendAlert(msg)
-		return
+
+	// 發生錯誤後的處理：儲存錯誤狀態並退出
+	if scrapeErr != nil {
+		log.Printf("執行失敗: %v (Count: %d)", scrapeErr, d.ErrorCount)
+		// ⚠️ 重要：即使失敗也要儲存，這樣下次才知道 ErrorCount > 0
+		if err := SaveCurrentData(d); err != nil {
+			log.Printf("❌ 無法儲存錯誤狀態: %v", err)
+		}
+		return // 結束程式
 	}
+
+	// --- 以下為成功抓取後的正常業務邏輯 ---
+	// 此時 d.ErrorCount 已經被 CheckErrorState 重置為 0
 
 	fmt.Printf("📊 加權指數: %.2f | 台指期: %.2f\n", spotVal, futureVal)
 
@@ -91,12 +113,6 @@ func main() {
 	if err != nil {
 		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用10點")
 		thresholdChanged = 10
-	}
-
-	// 從 Firestore 讀取上次被通知時的價差
-	d, err := GetLastNotifiedData()
-	if err != nil {
-		log.Printf("❌ 無法讀取上次價差，跳過抑制邏輯: %v", err)
 	}
 
 	msg, err := NewMessage(session)
@@ -128,5 +144,13 @@ func main() {
 		} else {
 			fmt.Printf("✅ 已儲存當前指數(%.2f)與價差 (%.2f) 作為下次比較的基準。\n", spotVal, spotVal-futureVal)
 		}
+	} else if shouldAlertError { // (這代表剛剛發生了 Recovery)
+		// 如果沒有觸發市場警報，但發生了系統狀態改變 (例如：Fail -> Normal Recovery)
+		// 必須儲存 d，以更新 ErrorCount=0 的狀態。
+		fmt.Println("✅ 系統恢復，儲存新狀態...")
+		if err := SaveCurrentData(d); err != nil {
+			log.Printf("❌ 儲存恢復狀態失敗: %v", err)
+		}
+
 	}
 }
