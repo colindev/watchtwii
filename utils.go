@@ -110,9 +110,9 @@ func CheckSpecificTimeAlert() (string, bool) {
 	} else if isEST && currentTime >= 2229 && currentTime <= 2231 {
 		// 5. 下午 22:30 -> 美股開盤 (注意：非夏令時間是 22:30，夏令時間是 21:30)
 		alertMsg = "🔔 美股市場開盤 (22:30 - 冬令時間)"
-	} else if currentTime >= 1559 && currentTime <= 1601 {
+	} else if !isEST && currentTime >= 1559 && currentTime <= 1601 {
 		alertMsg = "🔔 美股盤前交易時段 (16:00 - 夏令時間)"
-	} else if currentTime >= 2129 && currentTime <= 2131 {
+	} else if !isEST && currentTime >= 2129 && currentTime <= 2131 {
 		alertMsg = "🔔 美股市場開盤 (21:30 - 夏令時間)"
 	}
 
