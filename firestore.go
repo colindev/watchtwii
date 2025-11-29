@@ -124,7 +124,10 @@ func GetLastNotifiedData() (*Data, error) {
 	defer cancel()
 
 	var d = &Data{}
-	doc, err := client.Collection(FirestoreCollection).Doc(FirestoreDocID).Get(ctx)
+	doc, err := client.Collection(FirestoreCollection).
+		Doc(FirestoreDocID).
+		Get(ctx)
+
 	if err != nil {
 		if iterator.Done == err {
 			// 第一次運行，文件不存在，返回 0.0
@@ -147,7 +150,9 @@ func SaveCurrentData(d *Data) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	_, err = client.Collection(FirestoreCollection).Doc(FirestoreDocID).Set(ctx, d.Map())
+	_, err = client.Collection(FirestoreCollection).
+		Doc(FirestoreDocID).
+		Set(ctx, d.Map())
 
 	if err != nil {
 		return fmt.Errorf("寫入 Firestore 失敗: %w", err)

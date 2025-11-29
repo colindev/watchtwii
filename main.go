@@ -55,7 +55,7 @@ func main() {
 
 	var threshold float64 = 100 // 預設值
 	var err error
-	// --- 步驟 A: 讀取並驗證閾值 ---
+	// --- 讀取並驗證閾值 ---
 	if ThresholdEnv == "" {
 		fmt.Printf("❌ 錯誤: THRESHOLD 環境變數未設定。使用預設監控閾值: %.2f 點\n", threshold)
 	} else {
@@ -67,7 +67,13 @@ func main() {
 		}
 	}
 
-	// --- 步驟 B: 判斷盤別 ---
+	thresholdChanged, err := ParseToFloat(ThresholdChangedEnv)
+	if err != nil {
+		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用10點")
+		thresholdChanged = 10
+	}
+
+	// --- 判斷盤別 ---
 	session, isTrading := GetSessionType()
 	fmt.Printf("目前時段: %s, 是否交易中: %v\n", session, isTrading)
 
@@ -79,8 +85,9 @@ func main() {
 	// 從 Firestore 讀取上次被通知時的價差
 	d, err := GetLastNotifiedData()
 	if err != nil {
-		log.Printf("⚠️ 無法讀取上次狀態 (視為初次運行): %v", err)
-		d = &Data{} // 初始化空物件
+		// 進入此處代表發生了「初始化客戶端失敗」或「讀取文件失敗（非不存在）」
+		// 這是無法運行業務邏輯的致命錯誤 (配置、權限、網路連線等)
+		log.Fatalf("❌ Firestore 狀態讀取發生致命錯誤，請檢查配置與權限: %v", err)
 	}
 
 	// --- 執行爬蟲與錯誤狀態管理 ---
@@ -108,12 +115,6 @@ func main() {
 	// 此時 d.ErrorCount 已經被 CheckErrorState 重置為 0
 
 	fmt.Printf("📊 加權指數: %.2f | 台指期: %.2f\n", spotVal, futureVal)
-
-	thresholdChanged, err := ParseToFloat(ThresholdChangedEnv)
-	if err != nil {
-		fmt.Println("沒有設定價差抑制幅度 THRESHOLD_CHANGED, 預設使用10點")
-		thresholdChanged = 10
-	}
 
 	msg, err := NewMessage(session)
 	if err != nil {
