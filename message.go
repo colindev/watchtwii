@@ -34,60 +34,47 @@ func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, th
 	diff := spotVal - futureVal
 	changed := diff - d.LastDiffValue
 	// --- 早盤邏輯 ---
-	if diff > threshold {
-		shouldNotify = true
-		// 加權 > 台指 (逆價差過大)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n現貨強於期貨 (逆價差)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📈", math.Abs(diff), spotVal, futureVal)
 
+	// 1. **【新高/新低優先判斷】** 期貨突破當日高低點
+	if futureVal > d.FutureHigh {
+		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期貨當日新高\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
+			s.prefix, "📈", math.Abs(diff), spotVal, futureVal)
+	} else if futureVal < d.FutureLow {
+		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期貨當日新低\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
+			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
+
+	} else if diff > threshold {
+		// 2. 加權 > 期貨 (逆價差過大, 市場偏空)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 逆價差過大\n差距: %.2f 點\n加權: %.2f\n期貨: %.2f", "📉", s.prefix, diff, spotVal, futureVal)
+		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
-		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📉(價差幅度縮小:%.2f)\n%s", changed, alertMsg)
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📈(價差幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(逆價差幅度擴大:%.2f)\n%s", changed, alertMsg)
+		} else if changed < 0 {
+			alertMsg = fmt.Sprintf("📈(逆價差幅度縮小:%.2f)\n%s", changed, alertMsg)
 		}
+
 	} else if diff < -threshold {
+		// 3. 加權 < 期貨 (正價差過大, 市場偏多)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 正價差過大\n差距: %.2f 點\n加權: %.2f\n期貨: %.2f", "📈", s.prefix, math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
-		// 加權 < 台指 (正價差過大)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n期貨強於現貨 (正價差)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
-
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📉(價差幅度縮小:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📈(正價差幅度擴大:%.2f)\n%s", changed, alertMsg)
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📈(價差幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(正價差幅度縮小:%.2f)\n%s", changed, alertMsg)
 		}
-	} else if (spotVal - d.LastTWIIValue) > thresholdChanged {
-		shouldNotify = true
-		// 指數上漲 - 早盤關注加權變動
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n指數上漲(%.2f last: %.2f)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📈", (spotVal - d.LastTWIIValue), d.LastTWIIValue, math.Abs(diff), spotVal, futureVal)
-
-	} else if (spotVal - d.LastTWIIValue) < -thresholdChanged {
-		shouldNotify = true
-		// 指數下跌 - 早盤關注加權變動
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n指數下跌(%.2f last: %.2f)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📉", (spotVal - d.LastTWIIValue), d.LastTWIIValue, math.Abs(diff), spotVal, futureVal)
-
-	} else if spotVal > d.SpotHigh {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s (趨勢: %s) 指數當日新高\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📈", math.Abs(diff), spotVal, futureVal)
-
-	} else if spotVal < d.SpotLow {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s (趨勢: %s) 指數當日新低\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
 
 	} else {
-		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 台指變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
+		// 4. 未達通知閾值
+		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 價差變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
 	}
-
 	return alertMsg, shouldNotify
 }
 
@@ -102,62 +89,52 @@ func (s *SessionNightMessage) info(msg string, spotVal, futureVal float64) strin
 func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thresholdChanged float64) (string, bool) {
 	var alertMsg string
 	var shouldNotify bool
-	// 計算價差 (加權 - 期貨)
-	// 正數 = 逆價差 (期貨 < 加權, 市場偏空)
-	// 負數 = 正價差 (期貨 > 加權, 市場偏多)
-	diff := spotVal - futureVal
-	changed := diff - d.LastDiffValue
+	// 計算價差 (夜盤期貨 - 日盤收盤加權)
+	// 正數 = 期貨高於收盤
+	// 負數 = 期貨低於收盤
+	diff := futureVal - d.LastTWIIValue
+	changed := futureVal - d.LastTWIIValue - d.LastDiffValue // 實質上是 diff - d.LastDiffValue
 	// --- 夜盤邏輯 ---
-	// 注意：夜盤的加權是指數收盤價，通常用來參考國際盤對台指的拉動
-	if diff > threshold {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n台指期權差距: %.2f 點\n收盤台指: %.2f\n夜盤期權: %.2f",
-			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
 
+	// 1. **【新高/新低優先判斷】** 期貨突破當日高低點
+	if futureVal > d.FutureHigh {
+		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期貨當日新高\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+			s.prefix, "📈", math.Abs(diff), d.LastTWIIValue, futureVal)
+	} else if futureVal < d.FutureLow {
+		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期貨當日新低\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+			s.prefix, "📉", math.Abs(diff), d.LastTWIIValue, futureVal)
+
+	} else if diff > threshold {
+		// 2. 期貨 > 收盤 (大漲)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📈", diff, d.LastTWIIValue, futureVal)
+		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
-			shouldNotify = false // 跟上次確認差異過小,抑制通知
+			shouldNotify = false // 跟上次確認差異過小
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
-		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📈(期貨下跌幅度縮小:%.2f)\n%s", changed, alertMsg)
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
+		} else if changed < 0 {
+			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
 		}
-	} else if diff < -threshold {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n台指期權差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f",
-			s.prefix, "📈", math.Abs(diff), spotVal, futureVal)
 
+	} else if diff < -threshold {
+		// 3. 期貨 < 收盤 (大跌)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📉", math.Abs(diff), d.LastTWIIValue, futureVal)
+		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
-		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
-		}
-	} else if math.Abs(changed) >= thresholdChanged {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s 台指期權差距: %.2f(閾值: %.2f), 未達通知閾值\n",
-			s.prefix, diff, threshold)
-
-		if diff > 0 {
 			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
-		} else if diff < 0 {
-			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
+		} else if changed > 0 {
+			alertMsg = fmt.Sprintf("📈(期貨下跌幅度縮小:%.2f)\n%s", changed, alertMsg)
 		}
-
-	} else if futureVal > d.FutureHigh {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期權當日新高\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📈", math.Abs(diff), spotVal, futureVal)
-
-	} else if futureVal < d.FutureLow {
-		shouldNotify = true
-		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期權當日新低\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f",
-			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
 
 	} else {
-		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 期權漲跌幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
+		// 4. 未達通知閾值
+		fmt.Printf("%s 期貨與日盤收盤差距: %.2f(閾值: %.2f), 期貨漲跌幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
 	}
 
 	return alertMsg, shouldNotify

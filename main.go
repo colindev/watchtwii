@@ -89,6 +89,7 @@ func main() {
 		// 這是無法運行業務邏輯的致命錯誤 (配置、權限、網路連線等)
 		log.Fatalf("❌ Firestore 狀態讀取發生致命錯誤，請檢查配置與權限: %v", err)
 	}
+	fmt.Printf("%+v\n", d.Map()) // DEBUG
 
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
@@ -137,14 +138,14 @@ func main() {
 	}
 
 	shouldSave := d.UpdateDailyHighLow(spotVal, futureVal)
+	// 🎯 儲存當前價差，用於下次比較
+	d.LastTWIIValue = spotVal
+	d.LastDiffValue = spotVal - futureVal
 
 	// --- 發送 ---
 	if shouldNotify {
 		fmt.Println("觸發條件，發送 Telegram 通知...")
 		SendAlert(alertMsg)
-		// 🎯 儲存當前價差，用於下次比較
-		d.LastTWIIValue = spotVal
-		d.LastDiffValue = spotVal - futureVal
 		if err := SaveCurrentData(d); err != nil {
 			log.Printf("❌ 儲存當前價差失敗: %v", err)
 		} else {
