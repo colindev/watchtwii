@@ -130,11 +130,8 @@ func CheckSpecificTimeAlert() (string, bool) {
 		alertMsg = "🔔 美股市場開盤 (21:30 - 夏令時間)"
 	}
 
-	if alertMsg != "" {
-		return alertMsg, true
-	}
-
-	return "", false
+	isSpecificTime := alertMsg != ""
+	return alertMsg, isSpecificTime
 }
 
 // 透過 URL 跟 XPath 取得原始字串
