@@ -116,7 +116,7 @@ func (s *SessionNightMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal, t
 	} else if math.Abs(changed) >= thresholdChanged {
 		alertMsg = fmt.Sprintf("🌙 [夜盤警示] 台指期權差距: %.2f(閾值: %.2f), 未達通知閾值\n", diff, threshold)
 		if diff > 0 {
-			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
 		} else if diff < 0 {
 			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
 		}
