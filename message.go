@@ -85,7 +85,7 @@ func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, th
 			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
 
 	} else {
-		fmt.Printf("☀️ [早盤警示] 台指期權差距: %.2f(閾值: %.2f), 台指變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", diff, threshold, changed, thresholdChanged)
+		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 台指變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
 	}
 
 	return alertMsg, shouldNotify
@@ -157,7 +157,7 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
 
 	} else {
-		fmt.Printf("🌙 [夜盤警示] 台指期權差距: %.2f(閾值: %.2f), 期權漲跌幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", diff, threshold, changed, thresholdChanged)
+		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 期權漲跌幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
 	}
 
 	return alertMsg, shouldNotify
