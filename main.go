@@ -92,6 +92,9 @@ func main() {
 
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
+	if scrapeErr != nil && spotVal == 0 && IsTaipexPreOpen() {
+		spotVal = d.LastTWIIValue
+	}
 
 	// 🎯 核心：使用 CheckErrorState 處理狀態變化 (正常<->失敗)
 	shouldAlertError, errorMsg := d.CheckErrorState(scrapeErr)

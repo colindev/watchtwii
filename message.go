@@ -36,7 +36,7 @@ func (s *SessionMorningMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal,
 	// --- 早盤邏輯 ---
 	if diff > threshold {
 		// 加權 > 台指 (逆價差過大)
-		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n現貨強於期貨 (逆價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📈", math.Abs(diff), spotVal, futureVal)
+		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n現貨強於期貨 (逆價差)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f", "📈", math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
@@ -48,7 +48,7 @@ func (s *SessionMorningMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal,
 		}
 	} else if diff < -threshold {
 		// 加權 < 台指 (正價差過大)
-		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n期貨強於現貨 (正價差)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
+		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n期貨強於現貨 (正價差)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
@@ -60,11 +60,11 @@ func (s *SessionMorningMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal,
 		}
 	} else if (spotVal - lastTWIIVal) > thresholdChanged {
 		// 指數上漲 - 早盤關注加權變動
-		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數上漲(%.2f)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📈", (spotVal - lastTWIIVal), math.Abs(diff), spotVal, futureVal)
+		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數上漲(%.2f last: %.2f)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f", "📈", (spotVal - lastTWIIVal), lastTWIIVal, math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
 	} else if (spotVal - lastTWIIVal) < -thresholdChanged {
 		// 指數下跌 - 早盤關注加權變動
-		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數下跌(%.2f)\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", "📉", (spotVal - lastTWIIVal), math.Abs(diff), spotVal, futureVal)
+		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數下跌(%.2f last: %.2f)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f", "📉", (spotVal - lastTWIIVal), lastTWIIVal, math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
 	}
 	return alertMsg, shouldNotify
@@ -89,7 +89,7 @@ func (s *SessionNightMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal, t
 	// --- 夜盤邏輯 ---
 	// 注意：夜盤的加權是指數收盤價，通常用來參考國際盤對台指的拉動
 	if diff > threshold {
-		alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n收盤加權: %.2f\n夜盤台指: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
+		alertMsg = fmt.Sprintf("🌙 [夜盤警示] (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n台指期權差距: %.2f 點\n收盤台指: %.2f\n夜盤期權: %.2f", "📉", math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小,抑制通知

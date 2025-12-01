@@ -18,13 +18,19 @@ const (
 	SessionClosed  = "Closed"  // 休市
 )
 
-// 判斷台股早盤或夜盤
-// 回傳: sessionType (SessionMorning, SessionNight, SessionClosed), isTrading (bool)
-func GetSessionType() (string, bool) {
-	loc, err := time.LoadLocation("Asia/Taipei")
+var loc *time.Location
+
+func init() {
+	var err error
+	loc, err = time.LoadLocation("Asia/Taipei")
 	if err != nil {
 		log.Fatal("無法載入台北時區:", err)
 	}
+}
+
+// 判斷台股早盤或夜盤
+// 回傳: sessionType (SessionMorning, SessionNight, SessionClosed), isTrading (bool)
+func GetSessionType() (string, bool) {
 	now := time.Now().In(loc)
 
 	hour := now.Hour()
@@ -73,16 +79,24 @@ func IsUSMarketInWinterTime() (bool, error) {
 	return false, nil
 }
 
-// 輔助函式：檢查特定時間點是否觸發提醒 (誤差在 1 分鐘內)
-func CheckSpecificTimeAlert() (string, bool) {
-	loc, err := time.LoadLocation("Asia/Taipei")
-	if err != nil {
-		log.Fatal("無法載入台北時區:", err)
-	}
+func GetCurrentTime() (currentTime int) {
+
 	now := time.Now().In(loc)
 
 	// 使用 hour*100 + minute 格式來做快速比較
-	currentTime := now.Hour()*100 + now.Minute()
+	currentTime = now.Hour()*100 + now.Minute()
+	return
+}
+
+func IsTaipexPreOpen() bool {
+	currentTime := GetCurrentTime()
+	return currentTime >= 845 && currentTime <= 900
+}
+
+// 輔助函式：檢查特定時間點是否觸發提醒 (誤差在 1 分鐘內)
+func CheckSpecificTimeAlert() (string, bool) {
+
+	currentTime := GetCurrentTime()
 
 	// 儲存提醒訊息
 	var alertMsg string
