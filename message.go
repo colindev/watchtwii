@@ -89,11 +89,11 @@ func (s *SessionNightMessage) info(msg string, spotVal, futureVal float64) strin
 func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thresholdChanged float64) (string, bool) {
 	var alertMsg string
 	var shouldNotify bool
-	// 計算價差 (夜盤期貨 - 日盤收盤加權)
-	// 正數 = 期貨高於收盤
-	// 負數 = 期貨低於收盤
-	diff := futureVal - d.LastTWIIValue
-	changed := futureVal - d.LastTWIIValue - d.LastDiffValue // 實質上是 diff - d.LastDiffValue
+	// 計算價差 (日盤收盤加權 - 夜盤期貨)
+	// 正數 = 收盤高於期貨
+	// 負數 = 收盤低於期貨
+	diff := d.LastTWIIValue - futureVal
+	changed := diff - d.LastDiffValue
 	// --- 夜盤邏輯 ---
 
 	// 1. **【新高/新低優先判斷】** 期貨突破當日高低點
@@ -108,20 +108,7 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			s.prefix, "📉", math.Abs(diff), d.LastTWIIValue, futureVal)
 
 	} else if diff > threshold {
-		// 2. 期貨 > 收盤 (大漲)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📈", diff, d.LastTWIIValue, futureVal)
-		shouldNotify = true
-		if math.Abs(changed) < thresholdChanged {
-			shouldNotify = false // 跟上次確認差異過小
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
-		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
-		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
-		}
-
-	} else if diff < -threshold {
-		// 3. 期貨 < 收盤 (大跌)
+		// 收盤 > 期貨 (期貨大跌)
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📉", math.Abs(diff), d.LastTWIIValue, futureVal)
 		shouldNotify = true
 		if math.Abs(changed) < thresholdChanged {
@@ -131,6 +118,19 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
 		} else if changed > 0 {
 			alertMsg = fmt.Sprintf("📈(期貨下跌幅度縮小:%.2f)\n%s", changed, alertMsg)
+		}
+
+	} else if diff < -threshold {
+		// 收盤 < 期貨 (期貨大漲)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📈", diff, d.LastTWIIValue, futureVal)
+		shouldNotify = true
+		if math.Abs(changed) < thresholdChanged {
+			shouldNotify = false // 跟上次確認差異過小
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
+		} else if changed > 0 {
+			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
+		} else if changed < 0 {
+			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
 		}
 
 	} else {
