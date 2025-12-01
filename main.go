@@ -136,6 +136,8 @@ func main() {
 		}
 	}
 
+	shouldSave := d.UpdateDailyHighLow(spotVal, futureVal)
+
 	// --- 發送 ---
 	if shouldNotify {
 		fmt.Println("觸發條件，發送 Telegram 通知...")
@@ -148,6 +150,11 @@ func main() {
 		} else {
 			fmt.Printf("✅ 已儲存當前指數(%.2f)與價差 (%.2f) 作為下次比較的基準。\n", spotVal, spotVal-futureVal)
 		}
+	} else if shouldSave {
+		fmt.Println("✅ 欄位資料異動，儲存新狀態...")
+		if err := SaveCurrentData(d); err != nil {
+			log.Printf("❌ 儲存恢復狀態失敗: %v", err)
+		}
 	} else if shouldAlertError { // (這代表剛剛發生了 Recovery)
 		// 如果沒有觸發市場警報，但發生了系統狀態改變 (例如：Fail -> Normal Recovery)
 		// 必須儲存 d，以更新 ErrorCount=0 的狀態。
@@ -155,6 +162,5 @@ func main() {
 		if err := SaveCurrentData(d); err != nil {
 			log.Printf("❌ 儲存恢復狀態失敗: %v", err)
 		}
-
 	}
 }
