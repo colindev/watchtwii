@@ -101,6 +101,7 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期貨當日新高\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
 			s.prefix, "📈", math.Abs(diff), d.LastTWIIValue, futureVal)
+
 	} else if futureVal < d.FutureLow {
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s) 期貨當日新低\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
