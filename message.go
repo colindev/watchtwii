@@ -66,7 +66,10 @@ func (s *SessionMorningMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal,
 		// 指數下跌 - 早盤關注加權變動
 		alertMsg = fmt.Sprintf("☀️ [早盤警示] (趨勢: %s)\n指數下跌(%.2f last: %.2f)\n台指期權差距: %.2f 點\n台指: %.2f\n期權: %.2f", "📉", (spotVal - lastTWIIVal), lastTWIIVal, math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
+	} else {
+		fmt.Printf("☀️ [早盤警示] 台指期權差距: %.2f(閾值: %.2f), 台指變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", diff, threshold, changed, thresholdChanged)
 	}
+
 	return alertMsg, shouldNotify
 }
 
@@ -110,7 +113,10 @@ func (s *SessionNightMessage) build(lastTWIIVal, lastDiff, spotVal, futureVal, t
 		} else if changed > 0 {
 			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
 		}
+	} else {
+		fmt.Printf("🌙 [夜盤警示] 台指期權差距: %.2f(閾值: %.2f), 未達通知閾值\n", diff, threshold)
 	}
+
 	return alertMsg, shouldNotify
 }
 
