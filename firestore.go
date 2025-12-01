@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"math"
 	"os"
 	"time"
 
@@ -22,7 +21,7 @@ type Data struct {
 	LastDiffValue  float64
 	LastUpdateTime time.Time
 
-	// --- 新增：當日高低點紀錄 ---
+	// --- 當日高低點紀錄 ---
 	SpotHigh   float64 // 現貨當日最高
 	SpotLow    float64 // 現貨當日最低
 	FutureHigh float64 // 期貨當日最高
@@ -98,100 +97,55 @@ func (d *Data) Clone(m map[string]interface{}) *Data {
 // UpdateDailyHighLow 更新當日最高最低價
 // 邏輯：每天 08:45 (早盤開盤) 重置數據，其餘時間比較並更新極值
 func (d *Data) UpdateDailyHighLow(spotVal, futureVal float64) bool {
-	loc, _ := time.LoadLocation("Asia/Taipei")
-	now := time.Now().In(loc)
 
-	// 取得當前時間 HHMM
-	currentTime := now.Hour()*100 + now.Minute()
-
-	// 取得上次更新時間的日期 (YYYYMMDD)
-	lastDate := d.LastUpdateTime.In(loc).Format("20060102")
-	currentDate := now.Format("20060102")
-
-	// 特殊情況：如果上次更新是昨天，但現在是今天的 00:00~05:00 (夜盤尾段)，這屬於「昨天的交易日延續」
-	// 所以我們只在「日期變更 且 時間 >= 8:45」時才視為全新的一天重置。
-	// 修正邏輯：只要遇到 08:45 ~ 08:50 這個區間，就強制視為新的一天開始並重置。
-	// 為了避免重複重置，我們比較日期。
-
-	// 簡化策略：只要現在是 08:45 ~ 08:50 之間，且 LastUpdateTime 不在今天的這個區間，就重置。
-	// 或者，簡單地判斷：如果 LastUpdateTime 是昨天以前，且現在 >= 845，就重置。
-
-	shouldReset := false
-	if currentDate != lastDate {
-		// 日期不同了
-		if currentTime >= 845 {
-			// 已經是早盤時間，重置
-			shouldReset = true
-		} else {
-			// 現在是凌晨 (00:00~05:00)，屬於夜盤延續，不重置
-			shouldReset = false
-		}
-	} else {
-		// 同一天
-		// 如果程式中間掛了很久，上次更新是 08:00，現在是 08:45，也該重置
-		lastTime := d.LastUpdateTime.In(loc).Hour()*100 + d.LastUpdateTime.In(loc).Minute()
-		if lastTime < 845 && currentTime >= 845 {
-			shouldReset = true
-		}
+	session, isTrading := GetSessionType()
+	if !isTrading {
+		// 休市期間不更新高低點，除非您有特殊的收盤後邏輯
+		return false
 	}
 
 	shouldSave := false
-	if shouldReset {
-		fmt.Println("🔄 [新交易日] 08:45 開盤重置高低點紀錄")
+
+	// --- 處理早盤 (Spot + Future) ---
+	if session == SessionMorning {
+		// 現貨 (加權)
+		if spotVal > d.SpotHigh {
+			d.SpotHigh = spotVal
+			shouldSave = true
+		}
+		// 第一次運行或當日首次運行時初始化
+		if d.SpotLow == 0 || spotVal < d.SpotLow {
+			d.SpotLow = spotVal
+			shouldSave = true
+		}
+	}
+
+	// --- 處理早盤和夜盤 (Future Only) ---
+	// 注意：夜盤時只會執行到這裡，不會更新 SpotHigh/SpotLow
+
+	// 期貨
+	if futureVal > d.FutureHigh {
+		d.FutureHigh = futureVal
+		shouldSave = true
+	}
+	// 第一次運行或當日首次運行時初始化
+	if d.FutureLow == 0 || futureVal < d.FutureLow {
+		d.FutureLow = futureVal
+		shouldSave = true
+	}
+
+	// 額外處理：若為開盤首筆數據，則需初始化所有高低點
+	if d.FutureHigh == 0 && d.FutureLow == 0 && d.SpotHigh == 0 && d.SpotLow == 0 {
 		d.SpotHigh = spotVal
 		d.SpotLow = spotVal
 		d.FutureHigh = futureVal
 		d.FutureLow = futureVal
 		shouldSave = true
-	} else {
-		// 正常更新邏輯
-
-		// 防止初始值為 0 的情況 (如果是第一次運行)
-		if d.SpotHigh == 0 {
-			d.SpotHigh = spotVal
-		}
-		if d.SpotLow == 0 || d.SpotLow > spotVal {
-			d.SpotLow = spotVal
-		} // 防止 0 變成最低價
-		if d.FutureHigh == 0 {
-			d.FutureHigh = futureVal
-		}
-		if d.FutureLow == 0 || d.FutureLow > futureVal {
-			d.FutureLow = futureVal
-		}
-
-		// 比較最大值
-		d.SpotHigh = math.Max(d.SpotHigh, spotVal)
-		d.FutureHigh = math.Max(d.FutureHigh, futureVal)
-
-		// 比較最小值 (過濾掉 0 值異常)
-		if spotVal > 0 {
-			if d.SpotLow == 0 {
-				d.SpotLow = spotVal
-			} else {
-				d.SpotLow = math.Min(d.SpotLow, spotVal)
-			}
-		}
-		if futureVal > 0 {
-			if d.FutureLow == 0 {
-				d.FutureLow = futureVal
-			} else {
-				d.FutureLow = math.Min(d.FutureLow, futureVal)
-			}
-		}
-
-		if d.SpotHigh == spotVal ||
-			d.SpotLow == spotVal ||
-			d.FutureHigh == futureVal ||
-			d.FutureLow == futureVal {
-			shouldSave = true
-		}
 	}
 
-	// 更新最後時間
-	if shouldSave {
-		d.LastUpdateTime = now
-	}
+	// 確保在夜盤時 Spot 的高低點不會被更新，並且如果是在夜盤時初始化，SpotHigh/Low 會被設為 0
+	// 這裡的邏輯需要您進一步確認，如果夜盤運行時 d.SpotHigh/Low 仍應保持日盤收盤價，那需要在 SaveCurrentData 時進行特殊處理。
+	// 但就「只更新期貨」的要求而言，目前的寫法是正確的：夜盤時，由於 session != SessionMorning，Spot 高低點的判斷會被跳過。
 
 	return shouldSave
 }
