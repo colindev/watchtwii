@@ -95,6 +95,7 @@ func main() {
 	spotVal, futureVal, scrapeErr := ScrapeData()
 	if scrapeErr != nil && spotVal == 0 && IsTaipexPreOpen() {
 		spotVal = d.LastTWIIValue
+		scrapeErr = nil
 	}
 
 	// 🎯 核心：使用 CheckErrorState 處理狀態變化 (正常<->失敗)

@@ -45,6 +45,16 @@ func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, th
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權當日新低(前低: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
 			s.prefix, "📉", d.SpotLow, math.Abs(diff), spotVal, futureVal)
 
+	} else if (spotVal - d.LastTWIIValue) > thresholdChanged {
+		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權上漲幅度: %.2f (閾值: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
+			s.prefix, "📈", (spotVal - d.LastTWIIValue), thresholdChanged, math.Abs(diff), spotVal, futureVal)
+
+	} else if (spotVal - d.LastTWIIValue) < -thresholdChanged {
+		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權下跌幅度: %.2f (閾值: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
+			s.prefix, "📉", (spotVal - d.LastTWIIValue), thresholdChanged, math.Abs(diff), spotVal, futureVal)
+
 	} else if diff > threshold {
 		// 2. 加權 > 期貨 (逆價差過大, 市場偏空)
 		alertMsg = fmt.Sprintf("%s (趨勢: %s) 逆價差過大\n差距: %.2f 點\n加權: %.2f\n期貨: %.2f", "📉", s.prefix, diff, spotVal, futureVal)
