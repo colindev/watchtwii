@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 // --- 設定區 (建議透過環境變數注入) ---
@@ -48,6 +49,8 @@ var (
 	TelegramChatIDs     = os.Getenv("TELEGRAM_CHAT_IDS") // 預期格式: "123456,789012"
 	ThresholdEnv        = os.Getenv("THRESHOLD")
 	ThresholdChangedEnv = os.Getenv("THRESHOLD_CHANGED")
+
+	DebugEnv = os.Getenv("DEBUG")
 )
 
 func main() {
@@ -89,7 +92,10 @@ func main() {
 		// 這是無法運行業務邏輯的致命錯誤 (配置、權限、網路連線等)
 		log.Fatalf("❌ Firestore 狀態讀取發生致命錯誤，請檢查配置與權限: %v", err)
 	}
-	fmt.Printf("%+v\n", d.Map()) // DEBUG
+
+	if DebugEnv == "1" || strings.ToUpper(DebugEnv) == "TRUE" {
+		fmt.Printf("%+v\n", d.Map()) // DEBUG
+	}
 
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
@@ -148,9 +154,9 @@ func main() {
 		fmt.Println("觸發條件，發送 Telegram 通知...")
 		SendAlert(alertMsg)
 		if err := SaveCurrentData(d); err != nil {
-			log.Printf("❌ 儲存當前價差失敗: %v", err)
+			log.Printf("❌ 儲存當前價差失敗: %v\n", err)
 		} else {
-			fmt.Printf("✅ 已儲存當前指數(%.2f)與價差 (%.2f) 作為下次比較的基準。\n", spotVal, spotVal-futureVal)
+			fmt.Println("✅ 已儲存當前數據作為下次比較的基準。")
 		}
 	} else if shouldSave {
 		fmt.Println("✅ 欄位資料異動，儲存新狀態...")

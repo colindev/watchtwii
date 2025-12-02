@@ -239,5 +239,6 @@ func SaveCurrentData(d *Data) error {
 	if err != nil {
 		return fmt.Errorf("寫入 Firestore 失敗: %w", err)
 	}
+	fmt.Printf("✅ 儲存成功, 更新數據%+v\n", d.Map())
 	return nil
 }
