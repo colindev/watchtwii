@@ -2,8 +2,50 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"math"
 )
+
+// 輔助函式：檢查特定時間點是否觸發提醒 (誤差在 1 分鐘內)
+func CheckSpecificTimeAlert() (string, bool) {
+
+	currentTime := GetCurrentTime()
+
+	// 儲存提醒訊息
+	var alertMsg string
+
+	// 判斷邏輯: 檢查當前時間是否在目標時間的 [目標時間-1分鐘, 目標時間+1分鐘] 區間內
+
+	// 為了確保精確性，這裡加入夏令/非夏令時間判斷
+	isEST, err := IsUSMarketInWinterTime()
+	if err != nil {
+		log.Printf("❌ 無法判斷美東冬令時間: %v\n", err)
+	}
+
+	if currentTime >= 844 && currentTime <= 846 {
+		// 1. 早上 8:45 -> 台指期早盤開盤
+		alertMsg = "🔔 台指期早盤開盤倒數中 (08:45)"
+	} else if currentTime >= 859 && currentTime <= 901 {
+		// 2. 早上 9:00 -> 台股開盤
+		alertMsg = "🔔 台股現貨市場開盤 (09:00)"
+	} else if currentTime >= 1459 && currentTime <= 1501 {
+		// 3. 下午 15:00 -> 台指期夜盤開盤
+		alertMsg = "🔔 台指期夜盤開盤 (15:00)"
+	} else if isEST && currentTime >= 1659 && currentTime <= 1701 {
+		// 4. 下午 17:00 -> 美股盤前 (通常指 CME 交易開始或歐盤收盤前後)
+		alertMsg = "🔔 美股盤前交易時段 (17:00 - 冬令時間)"
+	} else if isEST && currentTime >= 2229 && currentTime <= 2231 {
+		// 5. 下午 22:30 -> 美股開盤 (注意：非夏令時間是 22:30，夏令時間是 21:30)
+		alertMsg = "🔔 美股市場開盤 (22:30 - 冬令時間)"
+	} else if !isEST && currentTime >= 1559 && currentTime <= 1601 {
+		alertMsg = "🔔 美股盤前交易時段 (16:00 - 夏令時間)"
+	} else if !isEST && currentTime >= 2129 && currentTime <= 2131 {
+		alertMsg = "🔔 美股市場開盤 (21:30 - 夏令時間)"
+	}
+
+	isSpecificTime := alertMsg != ""
+	return alertMsg, isSpecificTime
+}
 
 type SessionMessage interface {
 	// lastTWIIVal 前次指數
@@ -22,7 +64,7 @@ type SessionMorningMessage struct {
 }
 
 func (s *SessionMorningMessage) info(msg string, spotVal, futureVal float64) string {
-	return fmt.Sprintf("[%s]\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", msg, math.Abs(spotVal-futureVal), spotVal, futureVal)
+	return fmt.Sprintf("[%s]\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f", msg, math.Abs(spotVal-futureVal), spotVal, futureVal)
 }
 
 func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, thresholdChanged float64) (string, bool) {
@@ -93,7 +135,7 @@ type SessionNightMessage struct {
 }
 
 func (s *SessionNightMessage) info(msg string, spotVal, futureVal float64) string {
-	return fmt.Sprintf("[%s]\n差距: %.2f 點\n加權: %.2f\n台指: %.2f", msg, math.Abs(spotVal-futureVal), spotVal, futureVal)
+	return fmt.Sprintf("[%s]\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", msg, math.Abs(spotVal-futureVal), spotVal, futureVal)
 }
 
 func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thresholdChanged float64) (string, bool) {
