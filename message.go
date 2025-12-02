@@ -167,9 +167,9 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			shouldNotify = false // 跟上次確認差異過小
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
-		} else if changed > 0 {
 			alertMsg = fmt.Sprintf("📈(期貨下跌幅度縮小:%.2f)\n%s", changed, alertMsg)
+		} else if changed > 0 {
+			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
 		}
 
 	} else if diff < -threshold {
@@ -180,9 +180,9 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			shouldNotify = false // 跟上次確認差異過小
 			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
-		} else if changed < 0 {
 			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
+		} else if changed < 0 {
+			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
 		}
 
 	} else {
