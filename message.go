@@ -90,42 +90,51 @@ func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, th
 	} else if (spotVal - d.LastTWIIValue) > thresholdChanged {
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權上漲幅度: %.2f (前值: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
-			s.prefix, "📈", (spotVal - d.LastTWIIValue), d.LastTWIIValue, math.Abs(diff), spotVal, futureVal)
+			s.prefix, "📈", math.Abs(spotVal-d.LastTWIIValue), d.LastTWIIValue, math.Abs(diff), spotVal, futureVal)
 
 	} else if (spotVal - d.LastTWIIValue) < -thresholdChanged {
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權下跌幅度: %.2f (前值: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
-			s.prefix, "📉", (spotVal - d.LastTWIIValue), d.LastTWIIValue, math.Abs(diff), spotVal, futureVal)
+			s.prefix, "📉", math.Abs(spotVal-d.LastTWIIValue), d.LastTWIIValue, math.Abs(diff), spotVal, futureVal)
 
 	} else if diff > threshold {
-		// 2. 加權 > 期貨 (逆價差過大, 市場偏空)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s) 逆價差過大\n差距: %.2f 點\n加權: %.2f\n期貨: %.2f", "📉", s.prefix, diff, spotVal, futureVal)
 		shouldNotify = true
+		// 加權 > 期貨 (逆價差過大, 市場偏空)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 逆價差過大\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
+			s.prefix, "📉", math.Abs(diff), spotVal, futureVal)
+
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n",
+				math.Abs(diff), math.Abs(d.LastDiffValue), thresholdChanged)
+
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📉(逆價差幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(逆價差幅度擴大:%.2f)\n%s", math.Abs(changed), alertMsg)
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📈(逆價差幅度縮小:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📈(逆價差幅度縮小:%.2f)\n%s", math.Abs(changed), alertMsg)
 		}
 
 	} else if diff < -threshold {
-		// 3. 加權 < 期貨 (正價差過大, 市場偏多)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s) 正價差過大\n差距: %.2f 點\n加權: %.2f\n期貨: %.2f", "📈", s.prefix, math.Abs(diff), spotVal, futureVal)
 		shouldNotify = true
+		// 加權 < 期貨 (正價差過大, 市場偏多)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s) 正價差過大\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
+			s.prefix, "📈", math.Abs(diff), spotVal, futureVal)
+
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n",
+				math.Abs(diff), math.Abs(d.LastDiffValue), thresholdChanged)
+
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📈(正價差幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📈(正價差幅度擴大:%.2f)\n%s", math.Abs(changed), alertMsg)
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📉(正價差幅度縮小:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(正價差幅度縮小:%.2f)\n%s", math.Abs(changed), alertMsg)
 		}
 
 	} else {
-		// 4. 未達通知閾值
-		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 價差變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
+		// 未達通知閾值
+		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 價差變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n",
+			s.prefix, math.Abs(diff), threshold, math.Abs(changed), thresholdChanged)
 	}
 	return alertMsg, shouldNotify
 }
@@ -160,34 +169,43 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			s.prefix, "📉", d.FutureLow, math.Abs(diff), d.LastTWIIValue, futureVal)
 
 	} else if diff > threshold {
-		// 收盤 > 期貨 (期貨大跌)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📉", math.Abs(diff), d.LastTWIIValue, futureVal)
 		shouldNotify = true
+		// 收盤 > 期貨 (期貨大跌)
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大跌 (低於日盤收盤)\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+			s.prefix, "📉", math.Abs(diff), d.LastTWIIValue, futureVal)
+
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n",
+				math.Abs(diff), math.Abs(d.LastDiffValue), thresholdChanged)
+
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📈(期貨下跌幅度縮小:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📈(期貨下跌幅度縮小:%.2f)\n%s", math.Abs(changed), alertMsg)
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(期貨下跌幅度擴大:%.2f)\n%s", math.Abs(changed), alertMsg)
 		}
 
 	} else if diff < -threshold {
+
 		// 收盤 < 期貨 (期貨大漲)
-		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f", s.prefix, "📈", diff, d.LastTWIIValue, futureVal)
-		shouldNotify = true
+		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨大漲 (高於日盤收盤)\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+			s.prefix, "📈", math.Abs(diff), d.LastTWIIValue, futureVal)
+
 		if math.Abs(changed) < thresholdChanged {
 			shouldNotify = false // 跟上次確認差異過小
-			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n", diff, d.LastDiffValue, thresholdChanged)
+			fmt.Printf("✅ 已超過閾值 (%.2f)，但與上次通知值 (%.2f) 變動幅度不超過 %.2f，抑制通知。\n",
+				math.Abs(diff), math.Abs(d.LastDiffValue), thresholdChanged)
+
 		} else if changed > 0 {
-			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", math.Abs(changed), alertMsg)
 		} else if changed < 0 {
-			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", changed, alertMsg)
+			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", math.Abs(changed), alertMsg)
 		}
 
 	} else {
-		// 4. 未達通知閾值
-		fmt.Printf("%s 期貨與日盤收盤差距: %.2f(閾值: %.2f), 期貨漲跌幅度: %.2f(閾值: %.2f), 均未達通知閾值\n", s.prefix, diff, threshold, changed, thresholdChanged)
+		// 未達通知閾值
+		fmt.Printf("%s 期貨與日盤收盤差距: %.2f(閾值: %.2f), 期貨漲跌幅度: %.2f(閾值: %.2f), 均未達通知閾值\n",
+			s.prefix, math.Abs(diff), threshold, math.Abs(changed), thresholdChanged)
 	}
 
 	return alertMsg, shouldNotify
