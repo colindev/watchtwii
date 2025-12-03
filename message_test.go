@@ -78,6 +78,26 @@ func TestMessage_Build(t *testing.T) {
 			wantMsgSubstring: "期貨當日新低",
 		},
 
+		// --- 漲跌方向測試 ---
+		{
+			name:             "漲跌方向測試_夜盤下跌幅度縮小_應顯示跌幅縮小",
+			session:          SessionNight,
+			threshold:        100,
+			thresholdChanged: 50,
+			d: &Data{
+				LastDiffValue: 104.04000000000087,
+				LastTWIIValue: 27793.04,
+				SpotHigh:      27832.89,
+				SpotLow:       27342.53,
+				FutureHigh:    27875,
+				FutureLow:     27632,
+			},
+			spotVal:          27793.04,
+			futureVal:        27746.00,
+			wantNotify:       true,
+			wantMsgSubstring: "期貨下跌幅度減少",
+		},
+
 		// --- 閾值測試 ---
 		{
 			//skip:             true,
