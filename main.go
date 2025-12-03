@@ -100,6 +100,10 @@ func main() {
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
 	if scrapeErr != nil && spotVal == 0 && (IsTaipexPreOpen() || session == SessionNight) {
+		if futureVal == 0 {
+			fmt.Println("點數爬取錯誤") // 有機率為0
+			return
+		}
 		spotVal = d.LastTWIIValue
 		scrapeErr = nil
 	}
