@@ -222,7 +222,7 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨上漲反轉 (高於日盤收盤)\n期貨反轉幅度: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
 				s.prefix, "📈", math.Abs(changed), d.LastDiffValue, diff, d.LastTWIIValue, futureVal)
 		} else {
-			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨下跌 (低於日盤收盤)\n期貨下跌幅度增加: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨下跌 (低於日盤收盤)\n期貨下跌幅度減少: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
 				s.prefix, "📉", math.Abs(changed), d.LastDiffValue, diff, d.LastTWIIValue, futureVal)
 		}
 
