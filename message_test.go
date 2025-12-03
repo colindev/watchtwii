@@ -109,7 +109,7 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20000.0,
 			futureVal:        19940.0, // 價差 60 > 50 (未破新低 19900)
 			wantNotify:       true,
-			wantMsgSubstring: "夜盤期貨大跌", // 或 "逆價差過大" 視您的具體訊息而定
+			wantMsgSubstring: "夜盤期貨下跌 (低於日盤收盤)\n期貨下跌幅度增加",
 		},
 
 		// --- 抑制測試 ---
