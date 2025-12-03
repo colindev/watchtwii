@@ -101,7 +101,7 @@ func main() {
 	spotVal, futureVal, scrapeErr := ScrapeData()
 	if scrapeErr != nil && spotVal == 0 && (IsTaipexPreOpen() || session == SessionNight) {
 		if futureVal == 0 {
-			fmt.Println("點數爬取錯誤") // 有機率為0
+			fmt.Printf("點數爬取錯誤 加權: %.2f 期權: %.2f 錯誤: %v\n", spotVal, futureVal, scrapeErr) // 有機率為0
 			return
 		}
 		spotVal = d.LastTWIIValue
