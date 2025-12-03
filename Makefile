@@ -47,6 +47,9 @@ build:
 	# 檢查 VERSION 變數是否為空，若為空則報錯退出
 	@[ -z "$(VERSION)" ] && { echo "❌ 錯誤: 必須設定 VERSION 變數 (e.g., make build VERSION=v1.0.0)"; exit 1; } || true
 
+	@echo "--- 執行單元測試 ---"
+	go test -v
+
 	@echo "--- 執行 GCLOUD 建構與推送 ---"
 	@echo "目標映像檔標籤: $(TAG)"
 	# 執行 gcloud builds submit
