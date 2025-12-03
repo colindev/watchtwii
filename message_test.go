@@ -61,7 +61,7 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20500.0,
 			futureVal:        21000.0,
 			wantNotify:       true,
-			wantMsgSubstring: "加權當日新高", // 關鍵：如果程式邏輯沒改好，這裡會變成 "正價差過大"
+			wantMsgSubstring: "加權當早新高", // 關鍵：如果程式邏輯沒改好，這裡會變成 "正價差過大"
 		},
 		{
 			//skip:             true,
@@ -75,12 +75,30 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20000.0,
 			futureVal:        19000.0,
 			wantNotify:       true,
-			wantMsgSubstring: "期貨當日新低",
+			wantMsgSubstring: "期貨當早新低",
 		},
 
 		// --- 漲跌方向測試 ---
 		{
-			name:             "漲跌方向測試_夜盤下跌幅度縮小_應顯示跌幅縮小",
+			name:             "漲跌方向測試_早盤逆價差幅度增加_應顯示逆價差幅度增加",
+			session:          SessionMorning,
+			threshold:        baseThreshold,
+			thresholdChanged: baseThresholdChanged,
+			d: &Data{
+				LastDiffValue: 15,
+				LastTWIIValue: 20030,
+				SpotHigh:      20100,
+				SpotLow:       19900,
+				FutureHigh:    20010,
+				FutureLow:     19900,
+			},
+			spotVal:          20036,
+			futureVal:        19985,
+			wantNotify:       true,
+			wantMsgSubstring: "逆價差幅度增加",
+		},
+		{
+			name:             "漲跌方向測試_夜盤下跌幅度減少_應顯示下跌幅度減少",
 			session:          SessionNight,
 			threshold:        100,
 			thresholdChanged: 50,
@@ -97,6 +115,47 @@ func TestMessage_Build(t *testing.T) {
 			wantNotify:       true,
 			wantMsgSubstring: "期貨下跌幅度減少",
 		},
+		{
+			// map[ErrorCount:0 FutureHigh:27875 FutureLow:27632 LastDiffValue:-5.959999999999127 LastError: LastTWIIValue:27793.04 LastUpdateTime:2025-12-01 17:10:14.583025 +0000 UTC SpotHigh:27832.89 SpotLow:27342.53]
+			// resource.type = "cloud_run_job" resource.labels.job_name = "watchtwii" labels."run.googleapis.com/execution_name" = "watchtwii-jct4n" resource.labels.location = "asia-east1" timestamp >= "2025-12-03T20:30:05.560741Z" labels."run.googleapis.com/task_index" = "0" severity>=DEFAULT
+			name:             "漲跌方向測試_夜盤上漲幅度增加_應顯示上漲幅度增加",
+			session:          SessionNight,
+			threshold:        100,
+			thresholdChanged: 50,
+			d: &Data{
+				LastDiffValue: -5.959999999999127,
+				LastTWIIValue: 27793.04,
+				SpotHigh:      27832.89,
+				SpotLow:       27342.53,
+				FutureHigh:    27875,
+				FutureLow:     27632,
+			},
+			spotVal:          27793.04,
+			futureVal:        27854.00,
+			wantNotify:       true,
+			wantMsgSubstring: "期貨上漲幅度增加",
+		},
+		{
+			//skip: true,
+			// resource.type = "cloud_run_job" resource.labels.job_name = "watchtwii" labels."run.googleapis.com/execution_name" = "watchtwii-vg5b8" resource.labels.location = "asia-east1" timestamp >= "2025-12-03T13:40:05.391706Z" labels."run.googleapis.com/task_index" = "0" severity>=DEFAULT
+			// map[ErrorCount:0 FutureHigh:27875 FutureLow:27696 LastDiffValue:49.04000000000087 LastError: LastTWIIValue:27793.04 LastUpdateTime:2025-12-01 17:10:14.583025 +0000 UTC SpotHigh:27832.89 SpotLow:27342.53]
+			name:             "漲跌方向測試_期貨跌轉漲幅度超過異動閾值_夜盤期貨上漲反轉",
+			session:          SessionNight,
+			threshold:        100,
+			thresholdChanged: 50,
+			d: &Data{
+				LastDiffValue: 49.04000000000087,
+				LastTWIIValue: 27793.04,
+				SpotHigh:      27832.89,
+				SpotLow:       27342.53,
+				FutureHigh:    27875,
+				FutureLow:     27696,
+			},
+			spotVal:          27793.04,
+			futureVal:        27820.00,
+			wantNotify:       true,
+			wantMsgSubstring: "夜盤期貨上漲反轉 (高於早盤收盤)",
+		},
 
 		// --- 閾值測試 ---
 		{
@@ -109,7 +168,7 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20000.0,
 			futureVal:        19940.0, // 價差 60 > 50 (未破新低 19900)
 			wantNotify:       true,
-			wantMsgSubstring: "夜盤期貨下跌 (低於日盤收盤)\n期貨下跌幅度增加",
+			wantMsgSubstring: "夜盤期貨下跌 (低於早盤收盤)\n期貨下跌幅度增加",
 		},
 
 		// --- 抑制測試 ---
@@ -154,27 +213,6 @@ func TestMessage_Build(t *testing.T) {
 			wantMsgSubstring: "價差幅度", // 預期會有變動幅度的描述
 		},
 		{
-			//skip: true,
-			// resource.type = "cloud_run_job" resource.labels.job_name = "watchtwii" labels."run.googleapis.com/execution_name" = "watchtwii-vg5b8" resource.labels.location = "asia-east1" timestamp >= "2025-12-03T13:40:05.391706Z" labels."run.googleapis.com/task_index" = "0" severity>=DEFAULT
-			// map[ErrorCount:0 FutureHigh:27875 FutureLow:27696 LastDiffValue:49.04000000000087 LastError: LastTWIIValue:27793.04 LastUpdateTime:2025-12-01 17:10:14.583025 +0000 UTC SpotHigh:27832.89 SpotLow:27342.53]
-			name:             "抑制測試_期貨跌轉漲幅度超過異動閾值_應通知",
-			session:          SessionNight,
-			threshold:        100,
-			thresholdChanged: 50,
-			d: &Data{
-				LastDiffValue: 49.04000000000087,
-				LastTWIIValue: 27793.04,
-				SpotHigh:      27832.89,
-				SpotLow:       27342.53,
-				FutureHigh:    27875,
-				FutureLow:     27696,
-			},
-			spotVal:          27793.04,
-			futureVal:        27820.00,
-			wantNotify:       true,
-			wantMsgSubstring: "夜盤期貨上漲反轉 (高於日盤收盤)",
-		},
-		{
 			name:             "抑制測試_期貨漲轉跌幅度超過異動閾值_應通知",
 			session:          SessionNight,
 			threshold:        baseThreshold,
@@ -190,7 +228,7 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20010,
 			futureVal:        20005,
 			wantNotify:       true,
-			wantMsgSubstring: "夜盤期貨下跌反轉 (低於日盤收盤)",
+			wantMsgSubstring: "夜盤期貨下跌反轉 (低於早盤收盤)",
 		},
 	}
 
