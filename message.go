@@ -82,6 +82,7 @@ func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, th
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權當日新高(前高: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
 			s.prefix, "📈", d.SpotHigh, math.Abs(diff), spotVal, futureVal)
+
 	} else if spotVal < d.SpotLow {
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n加權當日新低(前低: %.2f)\n台指期權差距: %.2f 點\n加權: %.2f\n期貨: %.2f",
@@ -136,6 +137,7 @@ func (s *SessionMorningMessage) build(d *Data, spotVal, futureVal, threshold, th
 		fmt.Printf("%s 台指期權差距: %.2f(閾值: %.2f), 價差變動幅度: %.2f(閾值: %.2f), 均未達通知閾值\n",
 			s.prefix, math.Abs(diff), threshold, math.Abs(changed), thresholdChanged)
 	}
+
 	return alertMsg, shouldNotify
 }
 
@@ -157,7 +159,7 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 	changed := diff - d.LastDiffValue
 	// --- 夜盤邏輯 ---
 
-	// 1. **【新高/新低優先判斷】** 期貨突破當日高低點
+	// **【新高/新低優先判斷】** 期貨突破當日高低點
 	if futureVal > d.FutureHigh {
 		shouldNotify = true
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n期貨當日新高(前高: %.2f)\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
@@ -168,6 +170,7 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 		alertMsg = fmt.Sprintf("%s (趨勢: %s)\n期貨當日新低(前低: %.2f)\n期貨與日盤收盤差距: %.2f 點\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
 			s.prefix, "📉", d.FutureLow, math.Abs(diff), d.LastTWIIValue, futureVal)
 
+		// ** 價差變動超過閾值
 	} else if diff > threshold {
 		shouldNotify = true
 		// 收盤 > 期貨 (期貨大跌)
@@ -200,6 +203,27 @@ func (s *SessionNightMessage) build(d *Data, spotVal, futureVal, threshold, thre
 			alertMsg = fmt.Sprintf("📉(期貨上漲幅度縮小:%.2f)\n%s", math.Abs(changed), alertMsg)
 		} else if changed < 0 {
 			alertMsg = fmt.Sprintf("📈(期貨上漲幅度擴大:%.2f)\n%s", math.Abs(changed), alertMsg)
+		}
+
+		// ** 價差變動幅度超過閾值
+	} else if changed > thresholdChanged {
+		shouldNotify = true
+		if diff < 0 {
+			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨上漲 (高於日盤收盤)\n期貨上漲幅度增加: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+				s.prefix, "📈", math.Abs(changed), d.LastDiffValue, diff, d.LastTWIIValue, futureVal)
+		} else {
+			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨下跌反轉 (低於日盤收盤)\n期貨反轉幅度: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+				s.prefix, "📉", math.Abs(changed), d.LastDiffValue, diff, d.LastTWIIValue, futureVal)
+		}
+
+	} else if changed < -thresholdChanged {
+		shouldNotify = true
+		if diff < 0 {
+			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨上漲反轉 (高於日盤收盤)\n期貨反轉幅度: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+				s.prefix, "📈", math.Abs(changed), d.LastDiffValue, diff, d.LastTWIIValue, futureVal)
+		} else {
+			alertMsg = fmt.Sprintf("%s (趨勢: %s)\n夜盤期貨下跌 (低於日盤收盤)\n期貨下跌幅度增加: %.2f (前值: %.2f, 當前: %.2f)\n日盤收盤加權: %.2f\n夜盤期貨: %.2f",
+				s.prefix, "📉", math.Abs(changed), d.LastDiffValue, diff, d.LastTWIIValue, futureVal)
 		}
 
 	} else {
