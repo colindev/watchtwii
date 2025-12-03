@@ -37,7 +37,7 @@ func TestMessage_Build(t *testing.T) {
 		// --- 正常場景 ---
 		{
 			//skip:             true,
-			name:             "正常盤整_無觸發",
+			name:             "正常盤整_早盤_無觸發",
 			session:          SessionMorning,
 			threshold:        baseThreshold,
 			thresholdChanged: baseThresholdChanged,
@@ -45,6 +45,19 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20000.0,
 			futureVal:        20000.0, // 價差 0
 			wantNotify:       false,
+		},
+		{
+			//skip:             true,
+			name:             "正常盤整_夜盤_無觸發",
+			session:          SessionNight,
+			threshold:        baseThreshold,
+			thresholdChanged: baseThresholdChanged,
+			d:                baseData,
+			spotVal:          20000.0,
+			futureVal:        19990.0, // 當前價差 10 (<50閾值)
+			// 變動 = 10 - 11 = -1 (絕對值 1 < 10 thresholdChanged)
+			wantNotify:       false, // 應被抑制
+			wantMsgSubstring: "",
 		},
 
 		// --- 優先級測試 (關鍵驗證點) ---
@@ -174,7 +187,7 @@ func TestMessage_Build(t *testing.T) {
 		// --- 抑制測試 ---
 		{
 			//skip:             true,
-			name:             "抑制測試_超過閾值但變動微小",
+			name:             "抑制測試_早盤超過閾值但變動微小",
 			session:          SessionMorning,
 			threshold:        baseThreshold,
 			thresholdChanged: baseThresholdChanged,
