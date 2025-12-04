@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 )
 
 // --- 設定區 (建議透過環境變數注入) ---
@@ -99,10 +100,24 @@ func main() {
 
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
+	retry := 1
 	if scrapeErr != nil && spotVal == 0 && (IsTaipexPreOpen() || session == SessionNight) {
-		if futureVal == 0 {
-			fmt.Printf("點數爬取錯誤 加權: %.2f 期權: %.2f 錯誤: %v\n", spotVal, futureVal, scrapeErr) // 有機率為0
-			return
+		if futureVal == 0 { // 有機會爬到0
+			n := 0
+			for retry > 0 {
+				time.Sleep(time.Second * 10) // 等一下再重試
+				retry--
+				n++
+				fmt.Printf("點數爬取錯誤 加權: %.2f 期權: %.2f 錯誤: %v... 重試第%d次\n", spotVal, futureVal, scrapeErr, n)
+				_, futureVal, _ = ScrapeData()
+				if futureVal > 0 {
+					break
+				}
+			}
+			// 嘗試指定次數後如果還無法取得資料就直接退出放棄
+			if futureVal == 0 {
+				return
+			}
 		}
 		spotVal = d.LastTWIIValue
 		scrapeErr = nil
