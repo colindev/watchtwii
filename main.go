@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -20,28 +21,25 @@ const (
 	FutureXPath = "/html/body/div[1]/div/div/div/div/div[4]/div[1]/div/div/div[2]/div[3]/div[2]/div/div/ul/li[2]/div/div[4]/span"
 )
 
-func ScrapeData() (float64, float64, error) {
-	// 1. 取得加權指數
-	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
-	if err != nil {
-		return 0, 0, fmt.Errorf("抓取加權指數失敗: %w", err)
-	}
-	spotVal, err := ParseToFloat(rawSpot)
-	if err != nil {
-		return 0, 0, fmt.Errorf("解析加權指數失敗: %w", err)
-	}
+func ScrapeData() (spotVal float64, futureVal float64, errs error) {
 
-	// 2. 取得台指期
+	// 取得台指期
 	rawFuture, err := FetchValueString(FutureURL, FutureXPath)
 	if err != nil {
-		return 0, 0, fmt.Errorf("抓取台指期失敗: %w", err)
-	}
-	futureVal, err := ParseToFloat(rawFuture)
-	if err != nil {
-		return 0, 0, fmt.Errorf("解析台指期失敗: %w", err)
+		err = fmt.Errorf("抓取台指期失敗: %w", err)
+	} else if futureVal, err = ParseToFloat(rawFuture); err != nil {
+		err = fmt.Errorf("解析台指期失敗: %w", err)
 	}
 
-	return spotVal, futureVal, nil
+	// 取得加權指數
+	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
+	if err != nil {
+		errs = errors.Join(errs, fmt.Errorf("抓取加權指數失敗: %w", err))
+	} else if spotVal, err = ParseToFloat(rawSpot); err != nil {
+		errs = errors.Join(errs, fmt.Errorf("解析加權指數失敗: %w", err))
+	}
+
+	return
 }
 
 // 環境變數中的 Key
