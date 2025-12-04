@@ -100,27 +100,35 @@ func main() {
 
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
-	retry := 1
+	maxRetries := 3
 	if scrapeErr != nil && spotVal == 0 && (IsTaipexPreOpen() || session == SessionNight) {
 		if futureVal == 0 { // 有機會爬到0
-			n := 0
-			for retry > 0 {
+			for i := 1; i <= maxRetries; i++ {
+				fmt.Printf("⚠️ 盤前/夜盤期貨數值異常 (0), 等待 10秒後重試 (%d/%d)...\n", i, maxRetries)
 				time.Sleep(time.Second * 10) // 等一下再重試
-				retry--
-				n++
-				fmt.Printf("點數爬取錯誤 加權: %.2f 期權: %.2f 錯誤: %v... 重試第%d次\n", spotVal, futureVal, scrapeErr, n)
-				_, futureVal, _ = ScrapeData()
+				_, futureVal, scrapeErr = ScrapeData()
 				if futureVal > 0 {
-					break
+					fmt.Printf("✅ 重試成功！取得期貨數值: %.2f\n", futureVal)
+					break // 成功抓到，跳出迴圈
 				}
 			}
-			// 嘗試指定次數後如果還無法取得資料就直接退出放棄
-			if futureVal == 0 {
-				return
-			}
 		}
-		spotVal = d.LastTWIIValue
-		scrapeErr = nil
+		// 重試結束後的最終判斷
+		if futureVal > 0 {
+			// 情況 A: 成功取得期貨 (或是原本就有，或是重試後拿到)
+			// 此時我們使用 "上次的加權指數" 來填補 spotVal (因為盤前/夜盤 spot 本來就是 0)
+			spotVal = d.LastTWIIValue
+
+			// 重要：既然我們已經用 fallback 數據修復了，就應該清除錯誤
+			scrapeErr = nil
+		} else {
+			// 情況 B: 重試後期貨依然是 0
+			// 我們不 return，而是確保 scrapeErr 有值，讓後面的 CheckErrorState 處理
+			if scrapeErr == nil {
+				scrapeErr = fmt.Errorf("盤前/夜盤無法取得期貨報價 (數值為 0)")
+			}
+			// 程式繼續往下執行... -> 進到 CheckErrorState -> 記錄錯誤 -> 發送 System Alert -> Save Error -> Exit
+		}
 	}
 
 	// 🎯 核心：使用 CheckErrorState 處理狀態變化 (正常<->失敗)
