@@ -32,11 +32,11 @@ func ScrapeData() (spotVal float64, futureVal float64, errs error) {
 	}
 
 	// 取得加權指數
-	rawSpot, err := FetchValueString(SpotURL, SpotXPath)
-	if err != nil {
-		errs = errors.Join(errs, fmt.Errorf("抓取加權指數失敗: %w", err))
-	} else if spotVal, err = ParseToFloat(rawSpot); err != nil {
-		errs = errors.Join(errs, fmt.Errorf("解析加權指數失敗: %w", err))
+	rawSpot, errSpot := FetchValueString(SpotURL, SpotXPath)
+	if errSpot != nil {
+		errs = errors.Join(errs, fmt.Errorf("抓取加權指數失敗: %w", errSpot))
+	} else if spotVal, errSpot = ParseToFloat(rawSpot); errSpot != nil {
+		errs = errors.Join(errs, fmt.Errorf("解析加權指數失敗: %w", errSpot))
 	}
 
 	return
