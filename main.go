@@ -170,9 +170,6 @@ func main() {
 	}
 
 	shouldSave := d.UpdateDailyHighLow(spotVal, futureVal)
-	// 🎯 儲存當前價差，用於下次比較
-	d.LastTWIIValue = spotVal
-	d.LastDiffValue = spotVal - futureVal
 
 	// --- 發送 ---
 	if shouldNotify {
