@@ -74,7 +74,7 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20500.0,
 			futureVal:        21000.0,
 			wantNotify:       true,
-			wantMsgSubstring: "加權當早新高", // 關鍵：如果程式邏輯沒改好，這裡會變成 "正價差過大"
+			wantMsgSubstring: "加權當日新高", // 關鍵：如果程式邏輯沒改好，這裡會變成 "正價差過大"
 		},
 		{
 			//skip:             true,
@@ -88,7 +88,7 @@ func TestMessage_Build(t *testing.T) {
 			spotVal:          20000.0,
 			futureVal:        19000.0,
 			wantNotify:       true,
-			wantMsgSubstring: "期貨當早新低",
+			wantMsgSubstring: "期貨當日新低",
 		},
 
 		// --- 漲跌方向測試 ---
