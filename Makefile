@@ -8,10 +8,7 @@ RUN_PROJECT  := ${RUN_PROJECT}
 REGION     := ${REGION}
 JOB_NAME   := ${JOB_NAME}
 
-TELEGRAM_TOKEN := ${TELEGRAM_TOKEN}
-TELEGRAM_CHAT_IDS := ${TELEGRAM_CHAT_IDS}
-THRESHOLD := ${THRESHOLD}
-
+# 直接從cli注入
 DEBUG := ${DEBUG:-0}
 
 # VERSION 必須從外部傳入 (例如: make build VERSION=v1.0.0)
@@ -75,7 +72,7 @@ deploy:
 	  --cpu 1 \
 	  --memory 512Mi \
 	  --max-retries 0 \
-	  --set-env-vars TELEGRAM_TOKEN="$(TELEGRAM_TOKEN)",TELEGRAM_CHAT_IDS="$(TELEGRAM_CHAT_IDS)",THRESHOLD="$(THRESHOLD)",THRESHOLD_CHANGED="$(THRESHOLD_CHANGED)",GCP_PROJECT="$(RUN_PROJECT)",DEBUG="$(DEBUG)"
+	  --set-env-vars DEBUG="$(DEBUG)"
 	
 	@echo "✅ Cloud Run Job 部署成功或已更新至版本 $(VERSION)!"
 

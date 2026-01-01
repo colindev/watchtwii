@@ -28,5 +28,9 @@ ENV TZ Asia/Taipei
 # 將建置好的二進位執行檔從 Builder 階段複製過來
 COPY --from=builder /main /main
 
+# 複製設定檔
+COPY --from=builder /app/.env /.env
+RUN source /.env && rm /.env
+
 # 設定啟動點 (ENTRYPOINT)
 CMD ["/main"]

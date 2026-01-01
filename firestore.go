@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -188,10 +187,10 @@ func (d *Data) CheckErrorState(currentErr error) (bool, string) {
 }
 
 // 輔助函式：取得 Firestore 客戶端
-func getFirestoreClient() (*firestore.Client, error) {
+func getFirestoreClient(gcpProject string) (*firestore.Client, error) {
 	// 由於 Cloud Run Jobs 無法讀取GCP_PROJECT, 所以部署時餵入
 	ctx := context.Background()
-	client, err := firestore.NewClient(ctx, os.Getenv("GCP_PROJECT")) // 必須從 ENV 讀取 GCP_PROJECT ID
+	client, err := firestore.NewClient(ctx, gcpProject)
 	if err != nil {
 		return nil, fmt.Errorf("初始化 Firestore 客戶端失敗: %w", err)
 	}
@@ -199,8 +198,8 @@ func getFirestoreClient() (*firestore.Client, error) {
 }
 
 // GetLastNotifiedData 從 Firestore 讀取上次被通知時的價差。
-func GetLastNotifiedData() (*Data, error) {
-	client, err := getFirestoreClient()
+func GetLastNotifiedData(gcpProject string) (*Data, error) {
+	client, err := getFirestoreClient(gcpProject)
 	if err != nil {
 		return nil, err
 	}
@@ -226,8 +225,8 @@ func GetLastNotifiedData() (*Data, error) {
 }
 
 // SaveCurrentData 將當前的價差儲存到 Firestore。
-func SaveCurrentData(d *Data) error {
-	client, err := getFirestoreClient()
+func SaveCurrentData(gcpProject string, d *Data) error {
+	client, err := getFirestoreClient(gcpProject)
 	if err != nil {
 		return err
 	}

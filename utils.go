@@ -70,7 +70,7 @@ func IsUSMarketInWinterTime() (bool, error) {
 }
 
 // IsTodayInDateList 檢查今天是否在指定的日期清單中
-// input: "2025-11-11,2025-12-25"
+// input: "2025-11-11_2025-12-25"
 func IsTodayInDateList(dateListStr string, loc *time.Location) bool {
 	if dateListStr == "" {
 		return false
@@ -136,15 +136,10 @@ func ParseToFloat(raw string) (float64, error) {
 }
 
 // 發送 Telegram 通知
-func SendAlert(msg string) {
-	if TelegramToken == "" || TelegramChatIDs == "" {
-		log.Println("⚠️ 未設定 Telegram Token 或 Chat IDs，跳過通知")
-		log.Println("內容:", msg)
-		return
-	}
+func SendAlert(tgToken, tgChatIDs, msg string) {
 
 	pref := tele.Settings{
-		Token:  TelegramToken,
+		Token:  tgToken,
 		Poller: &tele.LongPoller{Timeout: 10 * time.Second},
 	}
 
@@ -155,7 +150,7 @@ func SendAlert(msg string) {
 	}
 
 	// 1. 使用逗號切割 ID 字串
-	ids := strings.Split(TelegramChatIDs, ",")
+	ids := strings.Split(tgChatIDs, ",")
 
 	for _, idStr := range ids {
 		// 2. 去除前後空白 (避免設定變數時多打空白導致錯誤)
