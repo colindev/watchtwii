@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 )
 
 // 輔助函式：檢查特定時間點是否觸發提醒 (誤差在 1 分鐘內)
-func CheckSpecificTimeAlert() (string, bool) {
+func CheckSpecificTimeAlert(loc *time.Location) (string, bool) {
 
-	currentTime := GetCurrentTime()
+	currentTime := GetCurrentTime(loc)
 
 	// 儲存提醒訊息
 	var alertMsg string

@@ -18,19 +18,9 @@ const (
 	SessionClosed  = "Closed"  // 休市
 )
 
-var loc *time.Location
-
-func init() {
-	var err error
-	loc, err = time.LoadLocation("Asia/Taipei")
-	if err != nil {
-		log.Fatal("無法載入台北時區:", err)
-	}
-}
-
 // 判斷台股早盤或夜盤
 // 回傳: sessionType (SessionMorning, SessionNight, SessionClosed), isTrading (bool)
-func GetSessionType() (string, bool) {
+func GetSessionType(loc *time.Location) (string, bool) {
 	now := time.Now().In(loc)
 
 	hour := now.Hour()
@@ -79,7 +69,31 @@ func IsUSMarketInWinterTime() (bool, error) {
 	return false, nil
 }
 
-func GetCurrentTime() (currentTime int) {
+// IsTodayInDateList 檢查今天是否在指定的日期清單中
+// input: "2025-11-11,2025-12-25"
+func IsTodayInDateList(dateListStr string, loc *time.Location) bool {
+	if dateListStr == "" {
+		return false
+	}
+
+	// 1. 取得指定時區的當天日期字串 (格式: YYYY-MM-DD)
+	todayStr := time.Now().In(loc).Format("2006-01-02")
+
+	// 2. 將輸入字串拆分成切片
+	dates := strings.Split(dateListStr, ",")
+
+	// 3. 比對是否符合
+	for _, d := range dates {
+		// 使用 TrimSpace 避免輸入字串包含空格 (例如 "2025-01-01, 2025-01-02")
+		if strings.TrimSpace(d) == todayStr {
+			return true
+		}
+	}
+
+	return false
+}
+
+func GetCurrentTime(loc *time.Location) (currentTime int) {
 
 	now := time.Now().In(loc)
 
@@ -88,8 +102,8 @@ func GetCurrentTime() (currentTime int) {
 	return
 }
 
-func IsTaipexPreOpen() bool {
-	currentTime := GetCurrentTime()
+func IsTaipexPreOpen(loc *time.Location) bool {
+	currentTime := GetCurrentTime(loc)
 	return currentTime >= 845 && currentTime <= 900
 }
 

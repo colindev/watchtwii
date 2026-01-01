@@ -96,13 +96,13 @@ func (d *Data) Clone(m map[string]interface{}) *Data {
 
 // UpdateDailyHighLow 更新當日最高最低價
 // 邏輯：每天 08:45 (早盤開盤) 重置數據，其餘時間比較並更新極值
-func (d *Data) UpdateDailyHighLow(spotVal, futureVal float64) bool {
+func (d *Data) UpdateDailyHighLow(spotVal, futureVal float64, loc *time.Location) bool {
 
 	// 🎯 儲存當前價差，用於下次比較
 	d.LastTWIIValue = spotVal
 	d.LastDiffValue = spotVal - futureVal
 
-	session, isTrading := GetSessionType()
+	session, isTrading := GetSessionType(loc)
 	if !isTrading {
 		// 休市期間不更新高低點，除非您有特殊的收盤後邏輯
 		return false

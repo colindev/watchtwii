@@ -44,13 +44,24 @@ func ScrapeData() (spotVal float64, futureVal float64, errs error) {
 
 // 環境變數中的 Key
 var (
-	TelegramToken       = os.Getenv("TELEGRAM_TOKEN")
-	TelegramChatIDs     = os.Getenv("TELEGRAM_CHAT_IDS") // 預期格式: "123456,789012"
-	ThresholdEnv        = os.Getenv("THRESHOLD")
-	ThresholdChangedEnv = os.Getenv("THRESHOLD_CHANGED")
+	TelegramToken              = os.Getenv("TELEGRAM_TOKEN")
+	TelegramChatIDs            = os.Getenv("TELEGRAM_CHAT_IDS") // 預期格式: "123456,789012"
+	ThresholdEnv               = os.Getenv("THRESHOLD")
+	ThresholdChangedEnv        = os.Getenv("THRESHOLD_CHANGED")
+	SpecialDates        string = os.Getenv("SPECIAL_DATES") // 預期格式: "2026-01-01,2026-02-11,..."
 
 	DebugEnv = os.Getenv("DEBUG")
 )
+
+var loc *time.Location
+
+func init() {
+	var err error
+	loc, err = time.LoadLocation("Asia/Taipei")
+	if err != nil {
+		log.Fatal("無法載入台北時區:", err)
+	}
+}
 
 func main() {
 	fmt.Println("啟動排程檢查...")
@@ -75,8 +86,14 @@ func main() {
 		thresholdChanged = 10
 	}
 
+	// 休市判斷
+	if IsTodayInDateList(SpecialDates, loc) {
+		fmt.Println("☕ 今天是預設休市日，程式結束。")
+		return // 直接中斷
+	}
+
 	// --- 判斷盤別 ---
-	session, isTrading := GetSessionType()
+	session, isTrading := GetSessionType(loc)
 	fmt.Printf("目前時段: %s, 是否交易中: %v\n", session, isTrading)
 
 	if !isTrading {
@@ -99,7 +116,7 @@ func main() {
 	// --- 執行爬蟲與錯誤狀態管理 ---
 	spotVal, futureVal, scrapeErr := ScrapeData()
 	maxRetries := 3
-	if scrapeErr != nil && spotVal == 0 && (IsTaipexPreOpen() || session == SessionNight) {
+	if scrapeErr != nil && spotVal == 0 && (IsTaipexPreOpen(loc) || session == SessionNight) {
 		if futureVal == 0 { // 有機會爬到0
 			for i := 1; i <= maxRetries; i++ {
 				fmt.Printf("⚠️ 盤前/夜盤期貨數值異常 (0), 等待 10秒後重試 (%d/%d)...\n", i, maxRetries)
@@ -160,7 +177,7 @@ func main() {
 	alertMsg, shouldNotify := msg.Build(d, spotVal, futureVal, threshold, thresholdChanged)
 
 	// 判斷是否為關鍵時間
-	specificAlterMsg, isSpecificTime := CheckSpecificTimeAlert()
+	specificAlterMsg, isSpecificTime := CheckSpecificTimeAlert(loc)
 	if isSpecificTime {
 		shouldNotify = true
 		// 如果沒有符合觸發條件, 但是特定時間點依然發送, 要補上訊息
@@ -169,7 +186,7 @@ func main() {
 		}
 	}
 
-	shouldSave := d.UpdateDailyHighLow(spotVal, futureVal)
+	shouldSave := d.UpdateDailyHighLow(spotVal, futureVal, loc)
 
 	// --- 發送 ---
 	if shouldNotify {
