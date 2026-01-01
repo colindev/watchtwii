@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colindev/osenv"
+	"github.com/joho/godotenv"
 )
 
 // --- 設定區 (建議透過環境變數注入) ---
@@ -70,6 +71,12 @@ type Config struct {
 
 // LoadConfig 負責載入並驗證設定，若缺少必要欄位則直接回傳 error (Fail-Fast)
 func LoadConfig() (*Config, error) {
+
+	err := godotenv.Load()
+	if err != nil {
+		return nil, fmt.Errorf("載入環境變數檔案失敗: %w", err)
+	}
+
 	cfg := &Config{}
 
 	// 使用您的 osenv 庫載入設定

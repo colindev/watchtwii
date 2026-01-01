@@ -30,7 +30,6 @@ COPY --from=builder /main /main
 
 # 複製設定檔
 COPY --from=builder /app/.env /.env
-RUN source /.env && rm /.env
 
 # 設定啟動點 (ENTRYPOINT)
 CMD ["/main"]
